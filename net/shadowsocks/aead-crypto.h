@@ -1,5 +1,5 @@
-#ifndef _NET_SHADOWSOCKS_AES_CRYPTO_H
-#define _NET_SHADOWSOCKS_AES_CRYPTO_H
+#ifndef _NET_SHADOWSOCKS_AEAD_CRYPTO_H
+#define _NET_SHADOWSOCKS_AEAD_CRYPTO_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -16,15 +16,23 @@
 namespace net {
 namespace shadowsocks {
 
-class AesMasterKey : public std::array<uint8_t, 16> {
+class AeadMasterKey : public std::array<uint8_t, 32> {
 public:
-    static AesMasterKey from_password(std::string_view password);
+    static AeadMasterKey from_password(
+        std::string_view password, const char* cipher_name);
+    uint32_t key_len() const { return key_len_; }
+    const EVP_AEAD* cipher() const  { return cipher_; }
+
+private:
+    uint32_t key_len_ = 0;
+    const EVP_AEAD* cipher_ = NULL;
 };
 
-class AesSessionKey {
+class AeadSessionKey {
 public:
-    AesSessionKey(const AesMasterKey &master_key, const uint8_t salt[16]);
-    ~AesSessionKey();
+    AeadSessionKey(
+        const AeadMasterKey &master_key, const uint8_t salt[]);
+    ~AeadSessionKey();
 
     void encrypt(
         absl::Span<const uint8_t> in, uint8_t *out, uint8_t out_tag[16]);
@@ -35,11 +43,12 @@ private:
     EVP_AEAD_CTX aead_ctx_;
     uint64_t nonce_low_ = 0;
     uint32_t nonce_high_ = 0;
+    uint32_t salt_len_ = 0;
 };
 
-class AesStream {
+class AeadStream {
 public:
-    AesStream(tcp::socket &socket, const AesMasterKey &master_key);
+    AeadStream(tcp::socket &socket, const AeadMasterKey &master_key);
 
     void read(
         std::function<void(
@@ -70,9 +79,9 @@ private:
         std::function<void(std::error_code)> callback);
 
     tcp::socket &socket_;
-    AesMasterKey master_key_;
-    std::optional<AesSessionKey> read_key_;
-    std::optional<AesSessionKey> write_key_;
+    AeadMasterKey master_key_;
+    std::optional<AeadSessionKey> read_key_;
+    std::optional<AeadSessionKey> write_key_;
     std::unique_ptr<uint8_t[]> read_buffer_;
     static constexpr size_t read_buffer_size_ = 16384 + 16;
     std::unique_ptr<uint8_t[]> write_buffer_;

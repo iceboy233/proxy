@@ -44,7 +44,7 @@ private:
 
     TcpServer &server_;
     tcp::socket socket_;
-    std::unique_ptr<AesStream> crypto_stream_;
+    std::unique_ptr<AeadStream> crypto_stream_;
     std::optional<tcp::socket> remote_socket_;
     std::unique_ptr<uint8_t[]> backward_buffer_;
     static constexpr size_t backward_buffer_size_ = 16383;
@@ -55,7 +55,7 @@ private:
 TcpServer::TcpServer(
     const any_io_executor &executor,
     const tcp::endpoint &endpoint,
-    const AesMasterKey &master_key)
+    const AeadMasterKey &master_key)
     : executor_(executor),
       master_key_(master_key),
       acceptor_(executor_, endpoint),
@@ -72,7 +72,7 @@ TcpServer::Connection::Connection(TcpServer &server)
     : server_(server),
       socket_(server_.executor_),
       // TODO(iceboy): Support other encryption algorithms.
-      crypto_stream_(std::make_unique<AesStream>(socket_, server_.master_key_)),
+      crypto_stream_(std::make_unique<AeadStream>(socket_, server_.master_key_)),
       backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)) {}
 
 void TcpServer::Connection::accept() {

@@ -55,9 +55,9 @@ private:
 TcpServer::TcpServer(
     const any_io_executor &executor,
     const tcp::endpoint &endpoint,
-    const AeadMasterKey &master_key)
+    std::unique_ptr<AeadFactory> crypto_factory)
     : executor_(executor),
-      master_key_(master_key),
+      crypto_factory_(std::move(crypto_factory)),
       acceptor_(executor_, endpoint),
       resolver_(executor_) {
     accept();
@@ -71,9 +71,9 @@ void TcpServer::accept() {
 TcpServer::Connection::Connection(TcpServer &server)
     : server_(server),
       socket_(server_.executor_),
-      // TODO(iceboy): Support other encryption algorithms.
-      crypto_stream_(std::make_unique<AeadStream>(socket_, server_.master_key_)),
-      backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)) {}
+      backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)) {
+    crypto_stream_ = server.crypto_factory_->new_crypto_stream(socket_);
+}
 
 void TcpServer::Connection::accept() {
     server_.acceptor_.async_accept(

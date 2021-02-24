@@ -16,22 +16,34 @@
 namespace net {
 namespace shadowsocks {
 
+class AeadCipher {
+public:
+    AeadCipher(const EVP_AEAD* aead, uint32_t salt_len, uint32_t key_len);
+    const EVP_AEAD* aead() const { return aead_; }
+    uint32_t salt_len() const {return salt_len_; }
+    uint32_t key_len() const { return key_len_; }
+
+private:
+    const EVP_AEAD* aead_ = NULL;
+    uint32_t salt_len_ = 0;
+    uint32_t key_len_ = 0;
+};
+
 class AeadMasterKey : public std::array<uint8_t, 32> {
 public:
     static AeadMasterKey from_password(
-        std::string_view password, const char* cipher_name);
+        std::string_view password, uint32_t key_len);
     uint32_t key_len() const { return key_len_; }
-    const EVP_AEAD* cipher() const  { return cipher_; }
 
 private:
     uint32_t key_len_ = 0;
-    const EVP_AEAD* cipher_ = NULL;
 };
 
 class AeadSessionKey {
 public:
     AeadSessionKey(
-        const AeadMasterKey &master_key, const uint8_t salt[]);
+        const AeadMasterKey &master_key, const AeadCipher &cipher, 
+        const uint8_t salt[]);
     ~AeadSessionKey();
 
     void encrypt(
@@ -43,12 +55,13 @@ private:
     EVP_AEAD_CTX aead_ctx_;
     uint64_t nonce_low_ = 0;
     uint32_t nonce_high_ = 0;
-    uint32_t salt_len_ = 0;
 };
 
 class AeadStream {
 public:
-    AeadStream(tcp::socket &socket, const AeadMasterKey &master_key);
+    AeadStream(
+        tcp::socket &socket, const AeadCipher &cipher, 
+        const AeadMasterKey &master_key);
 
     void read(
         std::function<void(
@@ -80,12 +93,26 @@ private:
 
     tcp::socket &socket_;
     AeadMasterKey master_key_;
+    AeadCipher cipher_;
     std::optional<AeadSessionKey> read_key_;
     std::optional<AeadSessionKey> write_key_;
     std::unique_ptr<uint8_t[]> read_buffer_;
-    static constexpr size_t read_buffer_size_ = 16384 + 16;
+    static constexpr size_t read_buffer_size_ = 16384 + 32;
     std::unique_ptr<uint8_t[]> write_buffer_;
-    static constexpr size_t write_buffer_size_ = 16384 + 50;
+    static constexpr size_t write_buffer_size_ = 16384 + 66;
+};
+
+class AeadFactory {
+public:
+    AeadFactory(const AeadCipher &cipher, const AeadMasterKey &master_key);
+    std::unique_ptr<AeadStream> new_crypto_stream(
+        tcp::socket &socket);
+    static std::unique_ptr<AeadFactory> new_from_spec(
+        std::string_view cipher, std::string_view password);
+        
+private:
+    AeadCipher cipher_;
+    AeadMasterKey master_key_;
 };
 
 }  // namespace shadowsocks

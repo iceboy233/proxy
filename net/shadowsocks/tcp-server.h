@@ -2,7 +2,7 @@
 #define _NET_SHADOWSOCKS_TCP_SERVER_H
 
 #include "net/asio.h"
-#include "net/shadowsocks/aes-crypto.h"
+#include "net/shadowsocks/aead-crypto.h"
 
 namespace net {
 namespace shadowsocks {
@@ -14,7 +14,7 @@ public:
     TcpServer(
         const any_io_executor &executor,
         const tcp::endpoint &endpoint,
-        const AesMasterKey &master_key);
+        std::unique_ptr<AeadFactory> crypto_factory);
 
 private:
     class Connection;
@@ -22,7 +22,7 @@ private:
     void accept();
 
     any_io_executor executor_;
-    AesMasterKey master_key_;
+    std::unique_ptr<AeadFactory> crypto_factory_;
     tcp::acceptor acceptor_;
     tcp::resolver resolver_;
 };

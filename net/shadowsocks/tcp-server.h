@@ -14,7 +14,7 @@ public:
     TcpServer(
         const any_io_executor &executor,
         const tcp::endpoint &endpoint,
-        std::unique_ptr<AeadFactory> crypto_factory);
+        const AeadMasterKey &master_key);
 
 private:
     class Connection;
@@ -22,7 +22,7 @@ private:
     void accept();
 
     any_io_executor executor_;
-    std::unique_ptr<AeadFactory> crypto_factory_;
+    const AeadMasterKey &master_key_;
     tcp::acceptor acceptor_;
     tcp::resolver resolver_;
 };

@@ -1,7 +1,7 @@
 #ifndef _NET_SHADOWSOCKS_WIRE_STRUCTS_H
 #define _NET_SHADOWSOCKS_WIRE_STRUCTS_H
 
-#include <stdint.h>
+#include <cstdint>
 
 #include "base/packed.h"
 #include "net/asio.h"

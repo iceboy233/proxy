@@ -1,7 +1,7 @@
 #include "net/shadowsocks/tcp-server.h"
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -44,7 +44,7 @@ private:
 
     TcpServer &server_;
     tcp::socket socket_;
-    std::unique_ptr<AeadStream> crypto_stream_;
+    AeadStream aead_stream_;
     std::optional<tcp::socket> remote_socket_;
     std::unique_ptr<uint8_t[]> backward_buffer_;
     static constexpr size_t backward_buffer_size_ = 16383;
@@ -55,9 +55,9 @@ private:
 TcpServer::TcpServer(
     const any_io_executor &executor,
     const tcp::endpoint &endpoint,
-    std::unique_ptr<AeadFactory> crypto_factory)
+    const AeadMasterKey &master_key)
     : executor_(executor),
-      crypto_factory_(std::move(crypto_factory)),
+      master_key_(master_key),
       acceptor_(executor_, endpoint),
       resolver_(executor_) {
     accept();
@@ -71,9 +71,8 @@ void TcpServer::accept() {
 TcpServer::Connection::Connection(TcpServer &server)
     : server_(server),
       socket_(server_.executor_),
-      backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)) {
-    crypto_stream_ = server.crypto_factory_->new_crypto_stream(socket_);
-}
+      aead_stream_(socket_, server_.master_key_),
+      backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)) {}
 
 void TcpServer::Connection::accept() {
     server_.acceptor_.async_accept(
@@ -92,7 +91,7 @@ void TcpServer::Connection::accept() {
 }
 
 void TcpServer::Connection::forward_read() {
-    crypto_stream_->read(
+    aead_stream_.read(
         [connection = boost::intrusive_ptr<Connection>(this)](
             std::error_code ec, absl::Span<const uint8_t> chunk) {
             if (ec) {
@@ -111,6 +110,7 @@ void TcpServer::Connection::forward_dispatch(absl::Span<const uint8_t> chunk) {
 
     // Parse address, assuming the whole address is in the first chunk.
     if (chunk.size() < 1) {
+        close();
         return;
     }
     const auto *header =
@@ -119,6 +119,7 @@ void TcpServer::Connection::forward_dispatch(absl::Span<const uint8_t> chunk) {
     switch (chunk[0]) {
     case 1:
         if (chunk.size() < 7) {
+            close();
             return;
         }
         forward_connect(
@@ -130,10 +131,12 @@ void TcpServer::Connection::forward_dispatch(absl::Span<const uint8_t> chunk) {
         break;
     case 3:
         if (chunk.size() < 2) {
+            close();
             return;
         }
         host_length = header->host_length;
         if (chunk.size() < host_length + 4) {
+            close();
             return;
         }
         forward_resolve(
@@ -143,6 +146,7 @@ void TcpServer::Connection::forward_dispatch(absl::Span<const uint8_t> chunk) {
         break;
     case 4:
         if (chunk.size() < 19) {
+            close();
             return;
         }
         forward_connect(
@@ -153,6 +157,7 @@ void TcpServer::Connection::forward_dispatch(absl::Span<const uint8_t> chunk) {
             chunk.subspan(19));
         break;
     default:
+        close();
         return;
     }
 }
@@ -227,7 +232,7 @@ void TcpServer::Connection::backward_read() {
 }
 
 void TcpServer::Connection::backward_write() {
-    crypto_stream_->write(
+    aead_stream_.write(
         {backward_buffer_.get(), backward_read_size_},
         [connection = boost::intrusive_ptr<Connection>(this)](
             std::error_code ec) {

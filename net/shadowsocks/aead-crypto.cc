@@ -1,79 +1,63 @@
 #include "net/shadowsocks/aead-crypto.h"
 
-#include <stdlib.h>
 #include <openssl/digest.h>
 #include <openssl/evp.h>
 #include <openssl/hkdf.h>
 #include <openssl/md5.h>
 #include <openssl/rand.h>
+#include <cstdlib>
 
 #include "base/logging.h"
 
 namespace net {
 namespace shadowsocks {
+namespace {
 
-struct aead_cipher {
-    const std::string   name;
-    const EVP_AEAD      *cipher;
-    uint32_t            salt_len;
-    uint32_t            key_len;
-};
+const std::array<std::pair<std::string_view, AeadMethod>, 4> methods = {{
+    {"aes-128-gcm", {EVP_aead_aes_128_gcm(), 16, 16}},
+    {"aes-192-gcm", {EVP_aead_aes_192_gcm(), 24, 24}},
+    {"aes-256-gcm", {EVP_aead_aes_256_gcm(), 32, 32}},
+    {"chacha20-ietf-poly1305", {EVP_aead_chacha20_poly1305(), 32, 32}},
+}};
 
-static aead_cipher aead_cipher_list[] =
-{
-    { .name = "aes-128-gcm",            .cipher = EVP_aead_aes_128_gcm(),
-        .salt_len = 16, .key_len = 16 },
-    { .name = "aes-192-gcm",            .cipher = EVP_aead_aes_192_gcm(),
-        .salt_len = 24, .key_len = 24 },
-    { .name = "aes-256-gcm",            .cipher = EVP_aead_aes_256_gcm(),
-        .salt_len = 32, .key_len = 32 },
-    { .name = "chacha20-ietf-poly1305", .cipher = EVP_aead_chacha20_poly1305(),
-        .salt_len = 32, .key_len = 32 },
-    {}
-};
+}  // namespace
 
-AeadCipher::AeadCipher(const EVP_AEAD* aead, uint32_t salt_len, uint32_t key_len)
-    : aead_(aead),
-      salt_len_(salt_len),
-      key_len_(key_len) {}
-
-AeadMasterKey AeadMasterKey::from_password(
-    std::string_view password, uint32_t key_len) {
-    AeadMasterKey key;
-    MD5_CTX ctx;
-    std::array<uint8_t, 16> digest;
-    key.key_len_ = key_len;
-    bool addmd = false;
-    for (uint32_t key_pos = 0; key_pos < key_len; addmd = true) {
-        MD5_Init(&ctx);
-        if (addmd) {
-            MD5_Update(&ctx, digest.data(), 16);
-        }
-        MD5_Update(&ctx, password.data(), password.size());
-        MD5_Final(digest.data(), &ctx);
-        for (uint32_t i = 0; i < 16; i++, key_pos++) {
-            if (key_pos >= key_len)
-                break;
-            key[key_pos] = digest[i];
+const AeadMethod &AeadMethod::from_name(std::string_view name) {
+    for (const auto &method : methods) {
+        if (method.first == name) {
+            return method.second;
         }
     }
-    return key;
+    LOG(fatal) << "invalid method: " << name;
+    abort();
+}
+
+void AeadMasterKey::init_with_password(std::string_view password) {
+    MD5_CTX ctx;
+    MD5_Init(&ctx);
+    MD5_Update(&ctx, password.data(), password.size());
+    MD5_Final(&key_[0], &ctx);
+    if (method_.key_size > 16) {
+        MD5_Init(&ctx);
+        MD5_Update(&ctx, &key_[0], 16);
+        MD5_Update(&ctx, password.data(), password.size());
+        MD5_Final(&key_[16], &ctx);
+    }
 }
 
 AeadSessionKey::AeadSessionKey(
-    const AeadMasterKey &master_key, const AeadCipher &cipher, 
-    const uint8_t salt[]) {
+    const AeadMasterKey &master_key, const uint8_t *salt) {
+    const AeadMethod &method = master_key.method();
     std::array<uint8_t, 32> key;
     if (!HKDF(
-        key.data(), cipher.key_len(), EVP_sha1(),
-        master_key.data(), master_key.key_len(), salt, cipher.salt_len(),
+        key.data(), method.key_size, EVP_sha1(),
+        master_key.data(), master_key.size(), salt, method.salt_size,
         reinterpret_cast<const uint8_t *>("ss-subkey"), 9)) {
         LOG(fatal) << "HKDF failed";
         abort();
     }
     if (!EVP_AEAD_CTX_init(
-        &aead_ctx_, cipher.aead(), key.data(), cipher.key_len(), 
-        16, nullptr)) {
+        &aead_ctx_, method.aead, key.data(), method.key_size, 16, nullptr)) {
         LOG(fatal) << "EVP_AEAD_CTX_init failed";
         abort();
     }
@@ -112,12 +96,9 @@ bool AeadSessionKey::decrypt(
     return true;
 }
 
-AeadStream::AeadStream(
-    tcp::socket &socket, const AeadCipher &cipher, 
-    const AeadMasterKey &master_key)
+AeadStream::AeadStream(tcp::socket &socket, const AeadMasterKey &master_key)
     : socket_(socket),
       master_key_(master_key),
-      cipher_(cipher),
       read_buffer_(std::make_unique<uint8_t[]>(read_buffer_size_)),
       write_buffer_(std::make_unique<uint8_t[]>(write_buffer_size_)) {}
 
@@ -144,14 +125,14 @@ void AeadStream::read_header(
     std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
     async_read(
         socket_,
-        buffer(read_buffer_.get(), cipher_.salt_len()),
+        buffer(read_buffer_.get(), master_key_.method().salt_size),
         [this, callback = std::move(callback)](
             std::error_code ec, size_t) mutable {
             if (ec) {
                 callback(ec, {});
                 return;
             }
-            read_key_.emplace(master_key_, cipher_, read_buffer_.get());
+            read_key_.emplace(master_key_, read_buffer_.get());
             read_length(std::move(callback));
         });
 }
@@ -209,20 +190,20 @@ void AeadStream::read_payload(
 void AeadStream::write_header(
     absl::Span<const uint8_t> chunk,
     std::function<void(std::error_code)> callback) {
-    uint32_t salt_len = cipher_.salt_len();
-    RAND_bytes(write_buffer_.get(), salt_len);
-    write_key_.emplace(master_key_, cipher_, write_buffer_.get());
-    write_buffer_[salt_len] = static_cast<uint8_t>(chunk.size() >> 8);
-    write_buffer_[salt_len + 1] = static_cast<uint8_t>(chunk.size());
+    const size_t salt_size = master_key_.method().salt_size;
+    RAND_bytes(write_buffer_.get(), salt_size);
+    write_key_.emplace(master_key_, write_buffer_.get());
+    write_buffer_[salt_size] = static_cast<uint8_t>(chunk.size() >> 8);
+    write_buffer_[salt_size + 1] = static_cast<uint8_t>(chunk.size());
     write_key_->encrypt(
-        {&write_buffer_[salt_len], 2}, 
-        &write_buffer_[salt_len],       // salt
-        &write_buffer_[salt_len + 2]);  // salt + len
+        {&write_buffer_[salt_size], 2},
+        &write_buffer_[salt_size],
+        &write_buffer_[salt_size + 2]);
     write_key_->encrypt(
-        chunk, 
-        &write_buffer_[salt_len + 18],  // salt + len + tag
-        &write_buffer_[salt_len + 18 + chunk.size()]);
-    write_payload(chunk.size() + salt_len + 34, std::move(callback));
+        chunk,
+        &write_buffer_[salt_size + 18],
+        &write_buffer_[salt_size + 18 + chunk.size()]);
+    write_payload(chunk.size() + salt_size + 34, std::move(callback));
 }
 
 void AeadStream::write_length(
@@ -246,36 +227,6 @@ void AeadStream::write_payload(
         [callback = std::move(callback)](std::error_code ec, size_t) {
             callback(ec);
         });
-}
-
-AeadFactory::AeadFactory(const AeadCipher &cipher, const AeadMasterKey &master_key)
-        : cipher_(cipher),
-          master_key_(master_key) {}
-
-std::unique_ptr<AeadStream> AeadFactory::new_crypto_stream(
-    tcp::socket &socket){
-    return std::make_unique<AeadStream>(socket, cipher_, master_key_);
-}
-
-std::unique_ptr<AeadFactory> AeadFactory::new_from_spec(
-    std::string_view cipher, std::string_view password) {
-    uint32_t salt_len = 0, key_len = 0;
-    const EVP_AEAD *aead = NULL;
-    for (int i = 0; aead_cipher_list[i].key_len; i++) {
-        if (aead_cipher_list[i].name == cipher) {
-            salt_len = aead_cipher_list[i].salt_len;
-            key_len = aead_cipher_list[i].key_len;
-            aead = aead_cipher_list[i].cipher;
-            break;
-        }
-    }
-    if (!key_len) {
-        LOG(fatal) << "Encrypt method '" << cipher << "' not supported";
-        abort();
-    }
-    return std::make_unique<AeadFactory>(
-        AeadCipher(aead, salt_len, key_len),
-        AeadMasterKey::from_password(password, key_len));
 }
 
 }  // namespace shadowsocks

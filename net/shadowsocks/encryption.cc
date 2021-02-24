@@ -72,26 +72,26 @@ void SessionKey::encrypt(
     size_t out_tag_len;
     if (!EVP_AEAD_CTX_seal_scatter(
         &aead_ctx_, out, out_tag, &out_tag_len, 16,
-        reinterpret_cast<uint8_t *>(&nonce_low_), 12,
+        reinterpret_cast<uint8_t *>(&nonce_), sizeof(nonce_),
         in.data(), in.size(), nullptr, 0, nullptr, 0) ||
         out_tag_len != 16) {
         LOG(fatal) << "EVP_AEAD_CTX_seal_scatter failed";
         abort();
     }
-    if (!++nonce_low_) {
-        ++nonce_high_;
+    if (!++nonce_.low) {
+        ++nonce_.high;
     }
 }
 
 bool SessionKey::decrypt(
     absl::Span<const uint8_t> in, const uint8_t in_tag[16], uint8_t *out) {
     if (!EVP_AEAD_CTX_open_gather(
-        &aead_ctx_, out, reinterpret_cast<uint8_t *>(&nonce_low_), 12,
+        &aead_ctx_, out, reinterpret_cast<uint8_t *>(&nonce_), sizeof(nonce_),
         in.data(), in.size(), in_tag, 16, nullptr, 0)) {
         return false;
     }
-    if (!++nonce_low_) {
-        ++nonce_high_;
+    if (!++nonce_.low) {
+        ++nonce_.high;
     }
     return true;
 }

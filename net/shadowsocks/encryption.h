@@ -9,6 +9,7 @@
 #include <optional>
 #include <string_view>
 #include <system_error>
+#include <boost/endian/arithmetic.hpp>
 
 #include "absl/types/span.h"
 #include "net/asio.h"
@@ -51,9 +52,14 @@ public:
         absl::Span<const uint8_t> in, const uint8_t in_tag[16], uint8_t *out);
 
 private:
+    struct Nonce {
+        boost::endian::little_uint64_t low = 0;
+        boost::endian::little_uint32_t high = 0;
+    };
+    static_assert(sizeof(Nonce) == 12);
+
     EVP_AEAD_CTX aead_ctx_;
-    uint64_t nonce_low_ = 0;
-    uint32_t nonce_high_ = 0;
+    Nonce nonce_;
 };
 
 class EncryptedStream {

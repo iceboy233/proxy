@@ -1,4 +1,4 @@
-#include "net/shadowsocks/aead-crypto.h"
+#include "net/shadowsocks/encryption.h"
 
 #include <openssl/digest.h>
 #include <openssl/evp.h>
@@ -13,7 +13,7 @@ namespace net {
 namespace shadowsocks {
 namespace {
 
-const std::array<std::pair<std::string_view, AeadMethod>, 4> methods = {{
+const std::array<std::pair<std::string_view, EncryptionMethod>, 4> methods = {{
     {"aes-128-gcm", {EVP_aead_aes_128_gcm(), 16, 16}},
     {"aes-192-gcm", {EVP_aead_aes_192_gcm(), 24, 24}},
     {"aes-256-gcm", {EVP_aead_aes_256_gcm(), 32, 32}},
@@ -22,7 +22,7 @@ const std::array<std::pair<std::string_view, AeadMethod>, 4> methods = {{
 
 }  // namespace
 
-const AeadMethod &AeadMethod::from_name(std::string_view name) {
+const EncryptionMethod &EncryptionMethod::from_name(std::string_view name) {
     for (const auto &method : methods) {
         if (method.first == name) {
             return method.second;
@@ -32,7 +32,7 @@ const AeadMethod &AeadMethod::from_name(std::string_view name) {
     abort();
 }
 
-void AeadMasterKey::init_with_password(std::string_view password) {
+void MasterKey::init_with_password(std::string_view password) {
     MD5_CTX ctx;
     MD5_Init(&ctx);
     MD5_Update(&ctx, password.data(), password.size());
@@ -45,9 +45,9 @@ void AeadMasterKey::init_with_password(std::string_view password) {
     }
 }
 
-AeadSessionKey::AeadSessionKey(
-    const AeadMasterKey &master_key, const uint8_t *salt) {
-    const AeadMethod &method = master_key.method();
+SessionKey::SessionKey(
+    const MasterKey &master_key, const uint8_t *salt) {
+    const EncryptionMethod &method = master_key.method();
     std::array<uint8_t, 32> key;
     if (!HKDF(
         key.data(), method.key_size, EVP_sha1(),
@@ -63,11 +63,11 @@ AeadSessionKey::AeadSessionKey(
     }
 }
 
-AeadSessionKey::~AeadSessionKey() {
+SessionKey::~SessionKey() {
     EVP_AEAD_CTX_cleanup(&aead_ctx_);
 }
 
-void AeadSessionKey::encrypt(
+void SessionKey::encrypt(
     absl::Span<const uint8_t> in, uint8_t *out, uint8_t out_tag[16]) {
     size_t out_tag_len;
     if (!EVP_AEAD_CTX_seal_scatter(
@@ -83,7 +83,7 @@ void AeadSessionKey::encrypt(
     }
 }
 
-bool AeadSessionKey::decrypt(
+bool SessionKey::decrypt(
     absl::Span<const uint8_t> in, const uint8_t in_tag[16], uint8_t *out) {
     if (!EVP_AEAD_CTX_open_gather(
         &aead_ctx_, out, reinterpret_cast<uint8_t *>(&nonce_low_), 12,
@@ -96,13 +96,14 @@ bool AeadSessionKey::decrypt(
     return true;
 }
 
-AeadStream::AeadStream(tcp::socket &socket, const AeadMasterKey &master_key)
+EncryptedStream::EncryptedStream(
+    tcp::socket &socket, const MasterKey &master_key)
     : socket_(socket),
       master_key_(master_key),
       read_buffer_(std::make_unique<uint8_t[]>(read_buffer_size_)),
       write_buffer_(std::make_unique<uint8_t[]>(write_buffer_size_)) {}
 
-void AeadStream::read(
+void EncryptedStream::read(
     std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
     if (!read_key_) {
         read_header(std::move(callback));
@@ -111,17 +112,17 @@ void AeadStream::read(
     }
 }
 
-void AeadStream::write(
+void EncryptedStream::write(
     absl::Span<const uint8_t> chunk,
     std::function<void(std::error_code)> callback) {
     if (!write_key_) {
         write_header(chunk, std::move(callback));
     } else {
-        write_length(chunk, std::move(callback));
+        write_length(chunk, 0, std::move(callback));
     }
 }
 
-void AeadStream::read_header(
+void EncryptedStream::read_header(
     std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
     async_read(
         socket_,
@@ -137,7 +138,7 @@ void AeadStream::read_header(
         });
 }
 
-void AeadStream::read_length(
+void EncryptedStream::read_length(
     std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
     async_read(
         socket_,
@@ -164,7 +165,7 @@ void AeadStream::read_length(
         });
 }
 
-void AeadStream::read_payload(
+void EncryptedStream::read_payload(
     size_t length,
     std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
     async_read(
@@ -187,43 +188,37 @@ void AeadStream::read_payload(
         });
 }
 
-void AeadStream::write_header(
+void EncryptedStream::write_header(
     absl::Span<const uint8_t> chunk,
     std::function<void(std::error_code)> callback) {
     const size_t salt_size = master_key_.method().salt_size;
     RAND_bytes(write_buffer_.get(), salt_size);
     write_key_.emplace(master_key_, write_buffer_.get());
-    write_buffer_[salt_size] = static_cast<uint8_t>(chunk.size() >> 8);
-    write_buffer_[salt_size + 1] = static_cast<uint8_t>(chunk.size());
+    write_length(chunk, salt_size, std::move(callback));
+}
+
+void EncryptedStream::write_length(
+    absl::Span<const uint8_t> chunk,
+    size_t offset,
+    std::function<void(std::error_code)> callback) {
+    write_buffer_[offset] = static_cast<uint8_t>(chunk.size() >> 8);
+    write_buffer_[offset + 1] = static_cast<uint8_t>(chunk.size());
     write_key_->encrypt(
-        {&write_buffer_[salt_size], 2},
-        &write_buffer_[salt_size],
-        &write_buffer_[salt_size + 2]);
+        {&write_buffer_[offset], 2},
+        &write_buffer_[offset], &write_buffer_[offset + 2]);
     write_key_->encrypt(
         chunk,
-        &write_buffer_[salt_size + 18],
-        &write_buffer_[salt_size + 18 + chunk.size()]);
-    write_payload(chunk.size() + salt_size + 34, std::move(callback));
+        &write_buffer_[offset + 18],
+        &write_buffer_[offset + 18 + chunk.size()]);
+    write_payload(offset + chunk.size() + 34, std::move(callback));
 }
 
-void AeadStream::write_length(
-    absl::Span<const uint8_t> chunk,
-    std::function<void(std::error_code)> callback) {
-    write_buffer_[0] = static_cast<uint8_t>(chunk.size() >> 8);
-    write_buffer_[1] = static_cast<uint8_t>(chunk.size());
-    write_key_->encrypt(
-        {&write_buffer_[0], 2}, &write_buffer_[0], &write_buffer_[2]);
-    write_key_->encrypt(
-        chunk, &write_buffer_[18], &write_buffer_[18 + chunk.size()]);
-    write_payload(chunk.size() + 34, std::move(callback));
-}
-
-void AeadStream::write_payload(
-    size_t length,
+void EncryptedStream::write_payload(
+    size_t size,
     std::function<void(std::error_code)> callback) {
     async_write(
         socket_,
-        buffer(write_buffer_.get(), length),
+        buffer(write_buffer_.get(), size),
         [callback = std::move(callback)](std::error_code ec, size_t) {
             callback(ec);
         });

@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <string_view>
 #include <system_error>
 
@@ -26,16 +25,17 @@ public:
 
 private:
     void forward_read();
-    void forward_dispatch(absl::Span<const uint8_t> chunk);
+    void forward_read_tail();
+    void forward_parse(absl::Span<const uint8_t> chunk);
     void forward_resolve(
         std::string_view host,
         uint16_t port,
-        absl::Span<const uint8_t> initial_data);
+        absl::Span<const uint8_t> initial_chunk);
 
     template <typename EndpointsT>
     void forward_connect(
         const EndpointsT &endpoints,
-        absl::Span<const uint8_t> initial_data);
+        absl::Span<const uint8_t> initial_chunk);
 
     void forward_write(absl::Span<const uint8_t> chunk);
     void backward_read();
@@ -44,18 +44,18 @@ private:
 
     TcpServer &server_;
     tcp::socket socket_;
-    AeadStream aead_stream_;
-    std::optional<tcp::socket> remote_socket_;
+    tcp::socket remote_socket_;
     std::unique_ptr<uint8_t[]> backward_buffer_;
     static constexpr size_t backward_buffer_size_ = 16383;
     size_t backward_read_size_;
+    EncryptedStream encrypted_stream_;
     // TODO(iceboy): timeout
 };
 
 TcpServer::TcpServer(
     const any_io_executor &executor,
     const tcp::endpoint &endpoint,
-    const AeadMasterKey &master_key)
+    const MasterKey &master_key)
     : executor_(executor),
       master_key_(master_key),
       acceptor_(executor_, endpoint),
@@ -71,8 +71,9 @@ void TcpServer::accept() {
 TcpServer::Connection::Connection(TcpServer &server)
     : server_(server),
       socket_(server_.executor_),
-      aead_stream_(socket_, server_.master_key_),
-      backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)) {}
+      remote_socket_(server_.executor_),
+      backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)),
+      encrypted_stream_(socket_, server_.master_key_) {}
 
 void TcpServer::Connection::accept() {
     server_.acceptor_.async_accept(
@@ -91,23 +92,30 @@ void TcpServer::Connection::accept() {
 }
 
 void TcpServer::Connection::forward_read() {
-    aead_stream_.read(
+    encrypted_stream_.read(
         [connection = boost::intrusive_ptr<Connection>(this)](
             std::error_code ec, absl::Span<const uint8_t> chunk) {
             if (ec) {
                 connection->close();
                 return;
             }
-            connection->forward_dispatch(chunk);
+            connection->forward_parse(chunk);
         });
 }
 
-void TcpServer::Connection::forward_dispatch(absl::Span<const uint8_t> chunk) {
-    if (remote_socket_) {
-        forward_write(chunk);
-        return;
-    }
+void TcpServer::Connection::forward_read_tail() {
+    encrypted_stream_.read(
+        [connection = boost::intrusive_ptr<Connection>(this)](
+            std::error_code ec, absl::Span<const uint8_t> chunk) {
+            if (ec) {
+                connection->close();
+                return;
+            }
+            connection->forward_write(chunk);
+        });
+}
 
+void TcpServer::Connection::forward_parse(absl::Span<const uint8_t> chunk) {
     // Parse address, assuming the whole address is in the first chunk.
     if (chunk.size() < 1) {
         close();
@@ -116,8 +124,8 @@ void TcpServer::Connection::forward_dispatch(absl::Span<const uint8_t> chunk) {
     const auto *header =
         reinterpret_cast<const wire::AddressHeader *>(chunk.data());
     size_t host_length;
-    switch (chunk[0]) {
-    case 1:
+    switch (header->type) {
+    case wire::AddressType::ipv4:
         if (chunk.size() < 7) {
             close();
             return;
@@ -129,7 +137,7 @@ void TcpServer::Connection::forward_dispatch(absl::Span<const uint8_t> chunk) {
                     (chunk[5]) << 8 | chunk[6])}},
             chunk.subspan(7));
         break;
-    case 3:
+    case wire::AddressType::host:
         if (chunk.size() < 2) {
             close();
             return;
@@ -144,7 +152,7 @@ void TcpServer::Connection::forward_dispatch(absl::Span<const uint8_t> chunk) {
             (chunk[host_length + 2]) << 8 | chunk[host_length + 3],
             chunk.subspan(host_length + 4));
         break;
-    case 4:
+    case wire::AddressType::ipv6:
         if (chunk.size() < 19) {
             close();
             return;
@@ -165,39 +173,38 @@ void TcpServer::Connection::forward_dispatch(absl::Span<const uint8_t> chunk) {
 void TcpServer::Connection::forward_resolve(
     std::string_view host,
     uint16_t port,
-    absl::Span<const uint8_t> initial_data) {
+    absl::Span<const uint8_t> initial_chunk) {
     server_.resolver_.async_resolve(
         host,
         absl::StrCat(port),
-        [connection = boost::intrusive_ptr<Connection>(this), initial_data](
+        [connection = boost::intrusive_ptr<Connection>(this), initial_chunk](
             std::error_code ec, const tcp::resolver::results_type &endpoints) {
             if (ec) {
                 connection->close();
                 return;
             }
-            connection->forward_connect(endpoints, initial_data);
+            connection->forward_connect(endpoints, initial_chunk);
         });
 }
 
 template <typename EndpointsT>
 void TcpServer::Connection::forward_connect(
     const EndpointsT &endpoints,
-    absl::Span<const uint8_t> initial_data) {
-    remote_socket_.emplace(server_.executor_);
+    absl::Span<const uint8_t> initial_chunk) {
     async_connect(
-        *remote_socket_,
+        remote_socket_,
         endpoints,
-        [connection = boost::intrusive_ptr<Connection>(this), initial_data](
+        [connection = boost::intrusive_ptr<Connection>(this), initial_chunk](
             std::error_code ec, const tcp::endpoint &) {
             if (ec) {
                 connection->close();
                 return;
             }
-            connection->remote_socket_->set_option(tcp::no_delay(true));
-            if (!initial_data.empty()) {
-                connection->forward_write(initial_data);
+            connection->remote_socket_.set_option(tcp::no_delay(true));
+            if (!initial_chunk.empty()) {
+                connection->forward_write(initial_chunk);
             } else {
-                connection->forward_read();
+                connection->forward_read_tail();
             }
             connection->backward_read();
         });
@@ -205,7 +212,7 @@ void TcpServer::Connection::forward_connect(
 
 void TcpServer::Connection::forward_write(absl::Span<const uint8_t> chunk) {
     async_write(
-        *remote_socket_,
+        remote_socket_,
         buffer(chunk.data(), chunk.size()),
         [connection = boost::intrusive_ptr<Connection>(this)](
             std::error_code ec, size_t) {
@@ -213,12 +220,12 @@ void TcpServer::Connection::forward_write(absl::Span<const uint8_t> chunk) {
                 connection->close();
                 return;
             }
-            connection->forward_read();
+            connection->forward_read_tail();
         });
 }
 
 void TcpServer::Connection::backward_read() {
-    remote_socket_->async_read_some(
+    remote_socket_.async_read_some(
         buffer(backward_buffer_.get(), backward_buffer_size_),
         [connection = boost::intrusive_ptr<Connection>(this)](
             std::error_code ec, size_t size) {
@@ -232,7 +239,7 @@ void TcpServer::Connection::backward_read() {
 }
 
 void TcpServer::Connection::backward_write() {
-    aead_stream_.write(
+    encrypted_stream_.write(
         {backward_buffer_.get(), backward_read_size_},
         [connection = boost::intrusive_ptr<Connection>(this)](
             std::error_code ec) {
@@ -245,9 +252,7 @@ void TcpServer::Connection::backward_write() {
 }
 
 void TcpServer::Connection::close() {
-    if (remote_socket_) {
-        remote_socket_->close();
-    }
+    remote_socket_.close();
     socket_.close();
 }
 

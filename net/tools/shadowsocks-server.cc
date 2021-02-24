@@ -4,7 +4,7 @@
 #include "base/logging.h"
 #include "net/asio.h"
 #include "net/asio-flags.h"
-#include "net/shadowsocks/aead-crypto.h"
+#include "net/shadowsocks/encryption.h"
 #include "net/shadowsocks/tcp-server.h"
 
 DEFINE_FLAG(net::address, ip, net::address_v4::loopback(), "");
@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     base::parse_flags(argc, argv);
 
     net::io_context io_context;
-    AeadMasterKey master_key(AeadMethod::from_name(flags::method));
+    MasterKey master_key(EncryptionMethod::from_name(flags::method));
     master_key.init_with_password(flags::password);
     TcpServer tcp_server(
         io_context.get_executor(),

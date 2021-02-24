@@ -16,34 +16,34 @@
 namespace net {
 namespace shadowsocks {
 
-struct AeadMethod {
+struct EncryptionMethod {
     const EVP_AEAD *aead;
     size_t salt_size;
     size_t key_size;
 
-    static const AeadMethod &from_name(std::string_view name);
+    static const EncryptionMethod &from_name(std::string_view name);
 };
 
-class AeadMasterKey {
+class MasterKey {
 public:
-    explicit AeadMasterKey(const AeadMethod &method) : method_(method) {}
+    explicit MasterKey(const EncryptionMethod &method) : method_(method) {}
 
     void init_with_password(std::string_view password);
 
     uint8_t *data() { return key_.data(); }
     const uint8_t *data() const { return key_.data(); }
     size_t size() const { return method_.key_size; }
-    const AeadMethod &method() const { return method_; }
+    const EncryptionMethod &method() const { return method_; }
 
 private:
+    const EncryptionMethod &method_;
     std::array<uint8_t, 32> key_;
-    AeadMethod method_;
 };
 
-class AeadSessionKey {
+class SessionKey {
 public:
-    AeadSessionKey(const AeadMasterKey &master_key, const uint8_t *salt);
-    ~AeadSessionKey();
+    SessionKey(const MasterKey &master_key, const uint8_t *salt);
+    ~SessionKey();
 
     void encrypt(
         absl::Span<const uint8_t> in, uint8_t *out, uint8_t out_tag[16]);
@@ -56,9 +56,9 @@ private:
     uint32_t nonce_high_ = 0;
 };
 
-class AeadStream {
+class EncryptedStream {
 public:
-    AeadStream(tcp::socket &socket, const AeadMasterKey &master_key);
+    EncryptedStream(tcp::socket &socket, const MasterKey &master_key);
 
     void read(
         std::function<void(
@@ -83,15 +83,16 @@ private:
         std::function<void(std::error_code)> callback);
     void write_length(
         absl::Span<const uint8_t> chunk,
+        size_t offset,
         std::function<void(std::error_code)> callback);
     void write_payload(
-        size_t length,
+        size_t size,
         std::function<void(std::error_code)> callback);
 
     tcp::socket &socket_;
-    const AeadMasterKey &master_key_;
-    std::optional<AeadSessionKey> read_key_;
-    std::optional<AeadSessionKey> write_key_;
+    const MasterKey &master_key_;
+    std::optional<SessionKey> read_key_;
+    std::optional<SessionKey> write_key_;
     std::unique_ptr<uint8_t[]> read_buffer_;
     static constexpr size_t read_buffer_size_ = 16384 + 16;
     std::unique_ptr<uint8_t[]> write_buffer_;

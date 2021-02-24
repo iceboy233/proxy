@@ -1,9 +1,9 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "aead-crypto",
-    srcs = ["aead-crypto.cc"],
-    hdrs = ["aead-crypto.h"],
+    name = "encryption",
+    srcs = ["encryption.cc"],
+    hdrs = ["encryption.h"],
     deps = [
         "@boringssl//:crypto",
         "@com_google_absl//absl/strings",
@@ -18,7 +18,7 @@ cc_library(
     srcs = ["tcp-server.cc"],
     hdrs = ["tcp-server.h"],
     deps = [
-        ":aead-crypto",
+        ":encryption",
         ":wire-structs",
         "@com_google_absl//absl/types:span",
         "@org_boost_boost//:smart_ptr",

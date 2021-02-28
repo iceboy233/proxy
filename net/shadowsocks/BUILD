@@ -20,7 +20,10 @@ cc_library(
     name = "hash-filter",
     srcs = ["hash-filter.cc"],
     hdrs = ["hash-filter.h"],
-    deps = ["@com_google_absl//absl/random"],
+    deps = [
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/random",
+    ],
 )
 
 cc_binary(
@@ -39,6 +42,15 @@ cc_binary(
     deps = [
         ":hash-filter",
         "@com_google_absl//absl/random",
+    ],
+)
+
+cc_test(
+    name = "hash-filter_test",
+    srcs = ["hash-filter_test.cc"],
+    deps = [
+        ":hash-filter",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 

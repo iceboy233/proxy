@@ -4,25 +4,30 @@
 #include <emmintrin.h>
 #endif
 #include <algorithm>
+#include <cstring>
+
+#include "absl/base/optimization.h"
 
 namespace net {
 namespace shadowsocks {
 
 HashFilter::HashFilter()
-    : buckets_(std::make_unique<Bucket[]>(num_buckets_)) {}
+    : buckets_(std::make_unique<Bucket[]>(num_buckets_)) {
+    clear();
+}
 
 void HashFilter::clear() {
-    std::fill(&buckets_[0], &buckets_[num_buckets_], Bucket());
+    memset(buckets_.get(), 0, num_buckets_ * sizeof(Bucket));
     size_ = 0;
 }
 
 bool HashFilter::insert(uint64_t fingerprint) {
     uint32_t fp32 = fingerprint;
-    if (!fp32) {
-        fp32 = 1;
+    if (ABSL_PREDICT_FALSE(!fp32)) {
+        fp32 = (fingerprint >> 32) | 1;
     }
     uint32_t index = (fingerprint >> 32) & (num_buckets_ - 1);
-    if (add(fp32, buckets_[index])) {
+    if (ABSL_PREDICT_TRUE(add(fp32, buckets_[index]))) {
         ++size_;
         return true;
     }
@@ -49,8 +54,8 @@ bool HashFilter::insert(uint64_t fingerprint) {
 
 bool HashFilter::test(uint64_t fingerprint) const {
     uint32_t fp32 = fingerprint;
-    if (!fp32) {
-        fp32 = 1;
+    if (ABSL_PREDICT_FALSE(!fp32)) {
+        fp32 = (fingerprint >> 32) | 1;
     }
     uint32_t index = (fingerprint >> 32) & (num_buckets_ - 1);
     if (find(buckets_[index], fp32)) {
@@ -62,7 +67,7 @@ bool HashFilter::test(uint64_t fingerprint) const {
 
 bool HashFilter::add(uint32_t fp32, Bucket &bucket) {
     for (uint32_t &entry : bucket.entries) {
-        if (!entry) {
+        if (ABSL_PREDICT_TRUE(!entry)) {
             entry = fp32;
             return true;
         }

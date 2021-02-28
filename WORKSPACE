@@ -19,6 +19,12 @@ git_repository(
 )
 
 git_repository(
+    name = "com_google_googletest",
+    commit = "dcc92d0ab6c4ce022162a23566d44f673251eee4",
+    remote = "https://github.com/google/googletest.git",
+)
+
+git_repository(
     name = "org_boost_boost",
     commit = "30dd3a31d48c29b149dc066a1a38e67db0bdbc5d",
     remote = "https://github.com/iceboy233/boost.git",

@@ -2,8 +2,10 @@
 #define _NET_SHADOWSOCKS_HASH_FILTER_H
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <type_traits>
 
 #include "absl/random/random.h"
 
@@ -28,15 +30,16 @@ public:
 
 private:
     struct Bucket {
-        std::array<uint32_t, 4> entries = {};
+        std::array<uint32_t, 4> entries;
     };
+    static_assert(std::is_trivial_v<Bucket>);
 
     static bool add(uint32_t fp32, Bucket &bucket);
     static bool find(const Bucket &bucket, uint32_t fp32);
 
     std::unique_ptr<Bucket[]> buckets_;
     static constexpr size_t num_buckets_ = 262144;
-    size_t size_ = 0;
+    size_t size_;
     absl::InsecureBitGen gen_;
 };
 

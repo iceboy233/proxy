@@ -8,14 +8,19 @@ namespace net {
 namespace shadowsocks {
 namespace {
 
+void BM_clear(benchmark::State &state) {
+    HashFilter filter;
+    for (auto _ : state) {
+        filter.clear();
+    }
+}
+
 void BM_insert(benchmark::State &state) {
     absl::InsecureBitGen gen;
     HashFilter filter;
-    int64_t count = 0;
     for (auto _ : state) {
-        if (++count >= state.range(0)) {
+        if (filter.size() >= state.range(0)) {
             filter.clear();
-            count = 0;
         }
         filter.insert(absl::Uniform<uint64_t>(gen));
     }
@@ -24,7 +29,7 @@ void BM_insert(benchmark::State &state) {
 void BM_test(benchmark::State &state) {
     absl::InsecureBitGen gen;
     HashFilter filter;
-    for (int64_t i = 0; i < state.range(0); ++i) {
+    while (filter.size() < state.range(0)) {
         filter.insert(absl::Uniform<uint64_t>(gen));
     }
     for (auto _ : state) {
@@ -32,6 +37,7 @@ void BM_test(benchmark::State &state) {
     }
 }
 
+BENCHMARK(BM_clear);
 BENCHMARK(BM_insert)
     ->Arg(100000)->Arg(200000)->Arg(400000)->Arg(600000)->Arg(800000)
     ->Arg(900000)->Arg(950000)->Arg(1000000);

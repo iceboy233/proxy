@@ -5,9 +5,14 @@
 #include <openssl/hkdf.h>
 #include <openssl/md5.h>
 #include <openssl/rand.h>
+#include <openssl/siphash.h>
 #include <cstdlib>
 
+#include "base/flags.h"
 #include "base/logging.h"
+
+DEFINE_FLAG(bool, detect_salt_reuse, true,
+            "Detect salt reuse to prevent replay attacks.");
 
 namespace net {
 namespace shadowsocks {
@@ -96,10 +101,29 @@ bool SessionKey::decrypt(
     return true;
 }
 
+SaltFilter::SaltFilter()
+    : current_(&filters_[0]) {
+    RAND_bytes(reinterpret_cast<uint8_t *>(key_.data()), sizeof(key_));
+}
+
+bool SaltFilter::test_and_insert(absl::Span<const uint8_t> salt) {
+    uint64_t fingerprint = SIPHASH_24(key_.data(), salt.data(), salt.size());
+    if (filters_[0].test(fingerprint) || filters_[1].test(fingerprint)) {
+        return false;
+    }
+    if (current_->size() >= 800000) {
+        current_ = current_ == &filters_[0] ? &filters_[1] : &filters_[0];
+        current_->clear();
+    }
+    current_->insert(fingerprint);
+    return true;
+}
+
 EncryptedStream::EncryptedStream(
-    tcp::socket &socket, const MasterKey &master_key)
+    tcp::socket &socket, const MasterKey &master_key, SaltFilter &salt_filter)
     : socket_(socket),
       master_key_(master_key),
+      salt_filter_(salt_filter),
       read_buffer_(std::make_unique<uint8_t[]>(read_buffer_size_)),
       write_buffer_(std::make_unique<uint8_t[]>(write_buffer_size_)) {}
 
@@ -126,14 +150,14 @@ void EncryptedStream::read_header(
     std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
     async_read(
         socket_,
-        buffer(read_buffer_.get(), master_key_.method().salt_size),
+        buffer(&read_buffer_[0], master_key_.method().salt_size),
         [this, callback = std::move(callback)](
             std::error_code ec, size_t) mutable {
             if (ec) {
                 callback(ec, {});
                 return;
             }
-            read_key_.emplace(master_key_, read_buffer_.get());
+            read_key_.emplace(master_key_, &read_buffer_[0]);
             read_length(std::move(callback));
         });
 }
@@ -142,7 +166,7 @@ void EncryptedStream::read_length(
     std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
     async_read(
         socket_,
-        buffer(read_buffer_.get(), 18),
+        buffer(&read_buffer_[32], 18),
         [this, callback = std::move(callback)](
             std::error_code ec, size_t) mutable {
             if (ec) {
@@ -150,12 +174,22 @@ void EncryptedStream::read_length(
                 return;
             }
             if (!read_key_->decrypt(
-                {&read_buffer_[0], 2}, &read_buffer_[2], &read_buffer_[0])) {
+                {&read_buffer_[32], 2}, &read_buffer_[34], &read_buffer_[32])) {
                 callback(
                     std::make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
-            size_t length = (read_buffer_[0] << 8) | read_buffer_[1];
+            if (flags::detect_salt_reuse && !read_key_allowed_) {
+                if (!salt_filter_.test_and_insert(
+                    {&read_buffer_[0], master_key_.method().salt_size})) {
+                    callback(
+                        std::make_error_code(std::errc::result_out_of_range),
+                        {});
+                    return;
+                }
+                read_key_allowed_ = true;
+            }
+            size_t length = (read_buffer_[32] << 8) | read_buffer_[33];
             if (length >= 16384) {
                 callback(
                     std::make_error_code(std::errc::result_out_of_range), {});
@@ -170,7 +204,7 @@ void EncryptedStream::read_payload(
     std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
     async_read(
         socket_,
-        buffer(read_buffer_.get(), length + 16),
+        buffer(&read_buffer_[0], length + 16),
         [this, length, callback = std::move(callback)](
             std::error_code ec, size_t) {
             if (ec) {
@@ -192,8 +226,8 @@ void EncryptedStream::write_header(
     absl::Span<const uint8_t> chunk,
     std::function<void(std::error_code)> callback) {
     const size_t salt_size = master_key_.method().salt_size;
-    RAND_bytes(write_buffer_.get(), salt_size);
-    write_key_.emplace(master_key_, write_buffer_.get());
+    RAND_bytes(&write_buffer_[0], salt_size);
+    write_key_.emplace(master_key_, &write_buffer_[0]);
     write_length(chunk, salt_size, std::move(callback));
 }
 
@@ -218,7 +252,7 @@ void EncryptedStream::write_payload(
     std::function<void(std::error_code)> callback) {
     async_write(
         socket_,
-        buffer(write_buffer_.get(), size),
+        buffer(&write_buffer_[0], size),
         [callback = std::move(callback)](std::error_code ec, size_t) {
             callback(ec);
         });

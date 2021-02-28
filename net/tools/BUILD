@@ -2,6 +2,7 @@ cc_binary(
     name = "shadowsocks-server",
     srcs = ["shadowsocks-server.cc"],
     deps = [
+        "//net/shadowsocks:encryption",
         "//net/shadowsocks:tcp-server",
         "@org_iceboy_trunk//base:flags",
         "@org_iceboy_trunk//base:logging",

@@ -9,8 +9,8 @@ HashFilter::HashFilter()
     : buckets_(std::make_unique<Bucket[]>(num_buckets_)) {}
 
 void HashFilter::clear() {
-    size_ = 0;
     std::fill(&buckets_[0], &buckets_[num_buckets_], Bucket());
+    size_ = 0;
 }
 
 bool HashFilter::insert(uint64_t fingerprint) {

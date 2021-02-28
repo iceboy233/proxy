@@ -55,9 +55,11 @@ private:
 TcpServer::TcpServer(
     const any_io_executor &executor,
     const tcp::endpoint &endpoint,
-    const MasterKey &master_key)
+    const MasterKey &master_key,
+    SaltFilter &salt_filter)
     : executor_(executor),
       master_key_(master_key),
+      salt_filter_(salt_filter),
       acceptor_(executor_, endpoint),
       resolver_(executor_) {
     accept();
@@ -73,7 +75,7 @@ TcpServer::Connection::Connection(TcpServer &server)
       socket_(server_.executor_),
       remote_socket_(server_.executor_),
       backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)),
-      encrypted_stream_(socket_, server_.master_key_) {}
+      encrypted_stream_(socket_, server_.master_key_, server_.salt_filter_) {}
 
 void TcpServer::Connection::accept() {
     server_.acceptor_.async_accept(

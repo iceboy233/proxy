@@ -13,6 +13,7 @@
 
 #include "absl/types/span.h"
 #include "net/asio.h"
+#include "net/shadowsocks/hash-filter.h"
 
 namespace net {
 namespace shadowsocks {
@@ -62,9 +63,23 @@ private:
     Nonce nonce_;
 };
 
+class SaltFilter {
+public:
+    SaltFilter();
+    bool test_and_insert(absl::Span<const uint8_t> salt);
+
+private:
+    HashFilter *current_;
+    std::array<HashFilter, 2> filters_;
+    std::array<uint64_t, 2> key_;
+};
+
 class EncryptedStream {
 public:
-    EncryptedStream(tcp::socket &socket, const MasterKey &master_key);
+    EncryptedStream(
+        tcp::socket &socket,
+        const MasterKey &master_key,
+        SaltFilter &salt_filter);
 
     void read(
         std::function<void(
@@ -97,12 +112,14 @@ private:
 
     tcp::socket &socket_;
     const MasterKey &master_key_;
-    std::optional<SessionKey> read_key_;
-    std::optional<SessionKey> write_key_;
+    SaltFilter &salt_filter_;
     std::unique_ptr<uint8_t[]> read_buffer_;
     static constexpr size_t read_buffer_size_ = 16384 + 16;
     std::unique_ptr<uint8_t[]> write_buffer_;
     static constexpr size_t write_buffer_size_ = 16384 + 66;
+    std::optional<SessionKey> read_key_;
+    bool read_key_allowed_ = false;
+    std::optional<SessionKey> write_key_;
 };
 
 }  // namespace shadowsocks

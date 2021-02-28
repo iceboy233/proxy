@@ -23,9 +23,11 @@ int main(int argc, char *argv[]) {
     net::io_context io_context;
     MasterKey master_key(EncryptionMethod::from_name(flags::method));
     master_key.init_with_password(flags::password);
+    SaltFilter salt_filter;
     TcpServer tcp_server(
         io_context.get_executor(),
         net::tcp::endpoint(flags::ip, flags::port),
-        master_key);
+        master_key,
+        salt_filter);
     io_context.run();
 }

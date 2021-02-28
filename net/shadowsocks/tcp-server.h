@@ -14,7 +14,8 @@ public:
     TcpServer(
         const any_io_executor &executor,
         const tcp::endpoint &endpoint,
-        const MasterKey &master_key);
+        const MasterKey &master_key,
+        SaltFilter &salt_filter);
 
 private:
     class Connection;
@@ -23,6 +24,7 @@ private:
 
     any_io_executor executor_;
     const MasterKey &master_key_;
+    SaltFilter &salt_filter_;
     tcp::acceptor acceptor_;
     tcp::resolver resolver_;
 };

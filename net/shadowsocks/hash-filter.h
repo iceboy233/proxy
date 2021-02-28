@@ -37,7 +37,7 @@ private:
     std::unique_ptr<Bucket[]> buckets_;
     static constexpr size_t num_buckets_ = 262144;
     size_t size_ = 0;
-    absl::BitGen gen_;
+    absl::InsecureBitGen gen_;
 };
 
 }  // namespace shadowsocks

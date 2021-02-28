@@ -9,7 +9,7 @@ namespace shadowsocks {
 namespace {
 
 void BM_insert(benchmark::State &state) {
-    absl::BitGen gen;
+    absl::InsecureBitGen gen;
     HashFilter filter;
     int64_t count = 0;
     for (auto _ : state) {
@@ -22,7 +22,7 @@ void BM_insert(benchmark::State &state) {
 }
 
 void BM_test(benchmark::State &state) {
-    absl::BitGen gen;
+    absl::InsecureBitGen gen;
     HashFilter filter;
     for (int64_t i = 0; i < state.range(0); ++i) {
         filter.insert(absl::Uniform<uint64_t>(gen));

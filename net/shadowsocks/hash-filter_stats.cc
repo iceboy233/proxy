@@ -8,7 +8,7 @@
 int main() {
     using net::shadowsocks::HashFilter;
 
-    absl::BitGen gen;
+    absl::InsecureBitGen gen;
     HashFilter filter;
     std::vector<uint64_t> fingerprints;
     for (int i = 0; i < 950000; ++i) {

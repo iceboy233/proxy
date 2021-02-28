@@ -15,6 +15,32 @@ cc_library(
 )
 
 cc_library(
+    name = "hash-filter",
+    srcs = ["hash-filter.cc"],
+    hdrs = ["hash-filter.h"],
+    deps = ["@com_google_absl//absl/random"],
+)
+
+cc_binary(
+    name = "hash-filter_benchmark",
+    srcs = ["hash-filter_benchmark.cc"],
+    deps = [
+        ":hash-filter",
+        "@com_google_absl//absl/random",
+        "@com_github_google_benchmark//:benchmark_main",
+    ],
+)
+
+cc_binary(
+    name = "hash-filter_stats",
+    srcs = ["hash-filter_stats.cc"],
+    deps = [
+        ":hash-filter",
+        "@com_google_absl//absl/random",
+    ],
+)
+
+cc_library(
     name = "tcp-server",
     srcs = ["tcp-server.cc"],
     hdrs = ["tcp-server.h"],

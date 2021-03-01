@@ -1,6 +1,8 @@
 #include "net/shadowsocks/hash-filter.h"
 
-#ifdef __SSE2__
+#if defined(__AVX2__)
+#include <immintrin.h>
+#elif defined(__SSE2__)
 #include <emmintrin.h>
 #endif
 #include <algorithm>
@@ -75,7 +77,13 @@ bool HashFilter::add(uint32_t fp32, Bucket &bucket) {
 }
 
 bool HashFilter::find_two(const Bucket &b0, const Bucket &b1, uint32_t fp32) {
-#ifdef __SSE2__
+#if defined(__AVX2__)
+    __m256i a = _mm256_loadu2_m128i(
+        reinterpret_cast<const __m128i *>(b0.entries.data()),
+        reinterpret_cast<const __m128i *>(b1.entries.data()));
+    __m256i b = _mm256_set1_epi32(fp32);
+    return _mm256_movemask_epi8(_mm256_cmpeq_epi32(a, b));
+#elif defined(__SSE2__)
     __m128i a0 = _mm_loadu_si128(
         reinterpret_cast<const __m128i *>(b0.entries.data()));
     __m128i a1 = _mm_loadu_si128(

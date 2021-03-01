@@ -58,11 +58,10 @@ bool HashFilter::test(uint64_t fingerprint) const {
         fp32 = (fingerprint >> 32) | 1;
     }
     uint32_t index = (fingerprint >> 32) & (num_buckets_ - 1);
-    if (find(buckets_[index], fp32)) {
-        return true;
-    }
-    index ^= fp32 & (num_buckets_ - 1);
-    return find(buckets_[index], fp32);
+    return find_two(
+        buckets_[index],
+        buckets_[index ^ (fp32 & (num_buckets_ - 1))],
+        fp32);
 }
 
 bool HashFilter::add(uint32_t fp32, Bucket &bucket) {
@@ -75,14 +74,23 @@ bool HashFilter::add(uint32_t fp32, Bucket &bucket) {
     return false;
 }
 
-bool HashFilter::find(const Bucket &bucket, uint32_t fp32) {
+bool HashFilter::find_two(const Bucket &b0, const Bucket &b1, uint32_t fp32) {
 #ifdef __SSE2__
-    __m128i a = _mm_loadu_si128(
-        reinterpret_cast<const __m128i *>(bucket.entries.data()));
+    __m128i a0 = _mm_loadu_si128(
+        reinterpret_cast<const __m128i *>(b0.entries.data()));
+    __m128i a1 = _mm_loadu_si128(
+        reinterpret_cast<const __m128i *>(b1.entries.data()));
     __m128i b = _mm_set1_epi32(fp32);
-    return _mm_movemask_epi8(_mm_cmpeq_epi32(a, b));
+    __m128i c0 = _mm_cmpeq_epi32(a0, b);
+    __m128i c1 = _mm_cmpeq_epi32(a1, b);
+    return _mm_movemask_epi8(_mm_or_si128(c0, c1));
 #else
-    for (uint32_t entry : bucket.entries) {
+    for (uint32_t entry : b0.entries) {
+        if (entry == fp32) {
+            return true;
+        }
+    }
+    for (uint32_t entry : b1.entries) {
         if (entry == fp32) {
             return true;
         }

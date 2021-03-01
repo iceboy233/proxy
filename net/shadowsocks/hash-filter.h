@@ -35,7 +35,7 @@ private:
     static_assert(std::is_trivial_v<Bucket>);
 
     static bool add(uint32_t fp32, Bucket &bucket);
-    static bool find(const Bucket &bucket, uint32_t fp32);
+    static bool find_two(const Bucket &b0, const Bucket &b1, uint32_t fp32);
 
     std::unique_ptr<Bucket[]> buckets_;
     static constexpr size_t num_buckets_ = 262144;

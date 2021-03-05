@@ -13,6 +13,7 @@ DEFINE_FLAG(std::string, password, "", "");
 DEFINE_FLAG(std::string, method, "aes-128-gcm",
             "Supported encryption methods: aes-128-gcm, aes-192-gcm, "
             "aes-256-gcm, chacha20-ietf-poly1305");
+DEFINE_FLAG(int, tcp_connection_timeout_secs, 300, "");
 
 int main(int argc, char *argv[]) {
     using namespace net::shadowsocks;
@@ -24,10 +25,14 @@ int main(int argc, char *argv[]) {
     MasterKey master_key(EncryptionMethod::from_name(flags::method));
     master_key.init_with_password(flags::password);
     SaltFilter salt_filter;
+    TcpServer::Options options;
+    options.connection_timeout = std::chrono::seconds(
+        flags::tcp_connection_timeout_secs);
     TcpServer tcp_server(
         io_context.get_executor(),
         net::tcp::endpoint(flags::ip, flags::port),
         master_key,
-        salt_filter);
+        salt_filter,
+        options);
     io_context.run();
 }

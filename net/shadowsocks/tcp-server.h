@@ -1,6 +1,8 @@
 #ifndef _NET_SHADOWSOCKS_TCP_SERVER_H
 #define _NET_SHADOWSOCKS_TCP_SERVER_H
 
+#include <chrono>
+
 #include "net/asio.h"
 #include "net/shadowsocks/encryption.h"
 
@@ -11,11 +13,17 @@ namespace shadowsocks {
 // called in the executor thread.
 class TcpServer {
 public:
+    struct Options {
+        std::chrono::nanoseconds connection_timeout =
+            std::chrono::nanoseconds::zero();
+    };
+
     TcpServer(
         const any_io_executor &executor,
         const tcp::endpoint &endpoint,
         const MasterKey &master_key,
-        SaltFilter &salt_filter);
+        SaltFilter &salt_filter,
+        const Options &options);
 
 private:
     class Connection;
@@ -25,6 +33,7 @@ private:
     any_io_executor executor_;
     const MasterKey &master_key_;
     SaltFilter &salt_filter_;
+    Options options_;
     tcp::acceptor acceptor_;
     tcp::resolver resolver_;
 };

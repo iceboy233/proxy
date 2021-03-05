@@ -40,26 +40,29 @@ private:
     void forward_write(absl::Span<const uint8_t> chunk);
     void backward_read();
     void backward_write();
+    void wait();
     void close();
 
     TcpServer &server_;
     tcp::socket socket_;
     tcp::socket remote_socket_;
+    steady_timer timer_;
     std::unique_ptr<uint8_t[]> backward_buffer_;
     static constexpr size_t backward_buffer_size_ = 16383;
     size_t backward_read_size_;
     EncryptedStream encrypted_stream_;
-    // TODO(iceboy): timeout
 };
 
 TcpServer::TcpServer(
     const any_io_executor &executor,
     const tcp::endpoint &endpoint,
     const MasterKey &master_key,
-    SaltFilter &salt_filter)
+    SaltFilter &salt_filter,
+    const Options &options)
     : executor_(executor),
       master_key_(master_key),
       salt_filter_(salt_filter),
+      options_(options),
       acceptor_(executor_, endpoint),
       resolver_(executor_) {
     accept();
@@ -74,6 +77,7 @@ TcpServer::Connection::Connection(TcpServer &server)
     : server_(server),
       socket_(server_.executor_),
       remote_socket_(server_.executor_),
+      timer_(server_.executor_),
       backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)),
       encrypted_stream_(socket_, server_.master_key_, server_.salt_filter_) {}
 
@@ -89,6 +93,7 @@ void TcpServer::Connection::accept() {
             }
             connection->socket_.set_option(tcp::no_delay(true));
             connection->forward_read();
+            connection->wait();
             connection->server_.accept();
         });
 }
@@ -102,6 +107,7 @@ void TcpServer::Connection::forward_read() {
                 return;
             }
             connection->forward_parse(chunk);
+            connection->wait();
         });
 }
 
@@ -114,6 +120,7 @@ void TcpServer::Connection::forward_read_tail() {
                 return;
             }
             connection->forward_write(chunk);
+            connection->wait();
         });
 }
 
@@ -186,6 +193,7 @@ void TcpServer::Connection::forward_resolve(
                 return;
             }
             connection->forward_connect(endpoints, initial_chunk);
+            connection->wait();
         });
 }
 
@@ -209,6 +217,7 @@ void TcpServer::Connection::forward_connect(
                 connection->forward_read_tail();
             }
             connection->backward_read();
+            connection->wait();
         });
 }
 
@@ -223,6 +232,7 @@ void TcpServer::Connection::forward_write(absl::Span<const uint8_t> chunk) {
                 return;
             }
             connection->forward_read_tail();
+            connection->wait();
         });
 }
 
@@ -237,6 +247,7 @@ void TcpServer::Connection::backward_read() {
             }
             connection->backward_read_size_ = size;
             connection->backward_write();
+            connection->wait();
         });
 }
 
@@ -250,10 +261,28 @@ void TcpServer::Connection::backward_write() {
                 return;
             }
             connection->backward_read();
+            connection->wait();
+        });
+}
+
+void TcpServer::Connection::wait() {
+    if (server_.options_.connection_timeout ==
+        std::chrono::nanoseconds::zero()) {
+        return;
+    }
+    timer_.expires_after(server_.options_.connection_timeout);
+    timer_.async_wait(
+        [connection = boost::intrusive_ptr<Connection>(this)](
+            std::error_code ec) {
+            if (ec) {
+                return;
+            }
+            connection->close();
         });
 }
 
 void TcpServer::Connection::close() {
+    timer_.cancel();
     remote_socket_.close();
     socket_.close();
 }

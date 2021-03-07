@@ -69,6 +69,22 @@ cc_library(
 )
 
 cc_library(
+    name = "udp-server",
+    srcs = ["udp-server.cc"],
+    hdrs = ["udp-server.h"],
+    deps = [
+        ":encryption",
+        ":wire-structs",
+        "@com_google_absl//absl/types:span",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@org_boost_boost//:smart_ptr",
+        "@org_iceboy_trunk//base:logging",
+        "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:asio-hash",
+    ],
+)
+
+cc_library(
     name = "wire-structs",
     hdrs = ["wire-structs.h"],
     deps = [

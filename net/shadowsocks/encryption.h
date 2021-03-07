@@ -1,5 +1,5 @@
-#ifndef _NET_SHADOWSOCKS_AEAD_CRYPTO_H
-#define _NET_SHADOWSOCKS_AEAD_CRYPTO_H
+#ifndef _NET_SHADOWSOCKS_ENCRYPTION_H
+#define _NET_SHADOWSOCKS_ENCRYPTION_H
 
 #include <openssl/aead.h>
 #include <array>
@@ -122,7 +122,33 @@ private:
     std::optional<SessionKey> write_key_;
 };
 
+class EncryptedDatagram {
+public:
+    EncryptedDatagram(
+        udp::socket &socket,
+        const MasterKey &master_key,
+        SaltFilter &salt_filter);
+
+    void receive_from(
+        std::function<void(
+            std::error_code, absl::Span<const uint8_t>, 
+            const udp::endpoint &)> callback);
+    void send_to(
+        absl::Span<const uint8_t> chunk, const udp::endpoint &endpoint,
+        std::function<void(std::error_code)> callback);
+
+private:
+    udp::socket &socket_;
+    const MasterKey &master_key_;
+    SaltFilter &salt_filter_;
+    std::unique_ptr<uint8_t[]> read_buffer_;
+    static constexpr size_t read_buffer_size_ = 65535;
+    std::unique_ptr<uint8_t[]> write_buffer_;
+    static constexpr size_t write_buffer_size_ = 65535;
+    udp::endpoint endpoint_;
+};
+
 }  // namespace shadowsocks
 }  // namespace net
 
-#endif  // _NET_SHADOWSOCKS_AES_CRYPTO_H
+#endif  // _NET_SHADOWSOCKS_ENCRYPTION_H

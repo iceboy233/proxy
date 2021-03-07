@@ -11,9 +11,6 @@
 #include "base/flags.h"
 #include "base/logging.h"
 
-DEFINE_FLAG(bool, detect_salt_reuse, true,
-            "Detect salt reuse to prevent replay attacks.");
-
 namespace net {
 namespace shadowsocks {
 namespace {
@@ -120,7 +117,7 @@ bool SaltFilter::test_and_insert(absl::Span<const uint8_t> salt) {
 }
 
 EncryptedStream::EncryptedStream(
-    tcp::socket &socket, const MasterKey &master_key, SaltFilter &salt_filter)
+    tcp::socket &socket, const MasterKey &master_key, SaltFilter *salt_filter)
     : socket_(socket),
       master_key_(master_key),
       salt_filter_(salt_filter),
@@ -179,8 +176,8 @@ void EncryptedStream::read_length(
                     std::make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
-            if (flags::detect_salt_reuse && !read_key_allowed_) {
-                if (!salt_filter_.test_and_insert(
+            if (salt_filter_ && !read_key_allowed_) {
+                if (!salt_filter_->test_and_insert(
                     {&read_buffer_[0], master_key_.method().salt_size})) {
                     callback(
                         std::make_error_code(std::errc::result_out_of_range),
@@ -259,7 +256,7 @@ void EncryptedStream::write_payload(
 }
 
 EncryptedDatagram::EncryptedDatagram(
-    udp::socket &socket, const MasterKey &master_key, SaltFilter &salt_filter)
+    udp::socket &socket, const MasterKey &master_key, SaltFilter *salt_filter)
     : socket_(socket),
       master_key_(master_key),
       salt_filter_(salt_filter),
@@ -267,15 +264,15 @@ EncryptedDatagram::EncryptedDatagram(
       write_buffer_(std::make_unique<uint8_t[]>(write_buffer_size_)) {}
 
 void EncryptedDatagram::receive_from(
-    std::function<void(
-        std::error_code, absl::Span<const uint8_t>, 
-        const udp::endpoint &)> callback) {
+    udp::endpoint &endpoint,
+    std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
     socket_.async_receive_from(
-        buffer(read_buffer_.get(), read_buffer_size_), endpoint_,
+        buffer(read_buffer_.get(), read_buffer_size_),
+        endpoint,
         [this, callback = std::move(callback)](
             std::error_code ec, size_t size) {
             if (ec) {
-                callback(ec, {}, endpoint_);
+                callback(ec, {});
                 return;
             }
             size_t salt_size = master_key_.method().salt_size;
@@ -287,19 +284,19 @@ void EncryptedDatagram::receive_from(
                 &read_buffer_[salt_size])) {
                 callback(
                     std::make_error_code(std::errc::result_out_of_range),
-                    {}, endpoint_);
+                    {});
                 return;
             }
-            if (flags::detect_salt_reuse) {
-                if (!salt_filter_.test_and_insert(
+            if (salt_filter_) {
+                if (!salt_filter_->test_and_insert(
                     {&read_buffer_[0], master_key_.method().salt_size})) {
                     callback(
                         std::make_error_code(std::errc::result_out_of_range),
-                        {}, endpoint_);
+                        {});
                     return;
                 }
             }
-            callback({}, {&read_buffer_[salt_size], payload_len}, endpoint_);
+            callback({}, {&read_buffer_[salt_size], payload_len});
         });
 }
 
@@ -313,7 +310,7 @@ void EncryptedDatagram::send_to(
         chunk, &write_buffer_[salt_size],
         &write_buffer_[salt_size + chunk.size()]);
     socket_.async_send_to(
-        buffer(write_buffer_.get(), salt_size + chunk.size() + 16), 
+        buffer(write_buffer_.get(), salt_size + chunk.size() + 16),
         endpoint,
         [this, callback = std::move(callback)](std::error_code ec, size_t) {
             callback(ec);

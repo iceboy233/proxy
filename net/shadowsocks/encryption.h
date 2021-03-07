@@ -79,7 +79,7 @@ public:
     EncryptedStream(
         tcp::socket &socket,
         const MasterKey &master_key,
-        SaltFilter &salt_filter);
+        SaltFilter *salt_filter);
 
     void read(
         std::function<void(
@@ -112,7 +112,7 @@ private:
 
     tcp::socket &socket_;
     const MasterKey &master_key_;
-    SaltFilter &salt_filter_;
+    SaltFilter *salt_filter_;
     std::unique_ptr<uint8_t[]> read_buffer_;
     static constexpr size_t read_buffer_size_ = 16384 + 16;
     std::unique_ptr<uint8_t[]> write_buffer_;
@@ -127,25 +127,25 @@ public:
     EncryptedDatagram(
         udp::socket &socket,
         const MasterKey &master_key,
-        SaltFilter &salt_filter);
+        SaltFilter *salt_filter);
 
     void receive_from(
+        udp::endpoint &endpoint,
         std::function<void(
-            std::error_code, absl::Span<const uint8_t>, 
-            const udp::endpoint &)> callback);
+            std::error_code, absl::Span<const uint8_t>)> callback);
     void send_to(
-        absl::Span<const uint8_t> chunk, const udp::endpoint &endpoint,
+        absl::Span<const uint8_t> chunk,
+        const udp::endpoint &endpoint,
         std::function<void(std::error_code)> callback);
 
 private:
     udp::socket &socket_;
     const MasterKey &master_key_;
-    SaltFilter &salt_filter_;
+    SaltFilter *salt_filter_;
     std::unique_ptr<uint8_t[]> read_buffer_;
     static constexpr size_t read_buffer_size_ = 65535;
     std::unique_ptr<uint8_t[]> write_buffer_;
     static constexpr size_t write_buffer_size_ = 65535;
-    udp::endpoint endpoint_;
 };
 
 }  // namespace shadowsocks

@@ -9,6 +9,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "base/logging.h"
+#include "boost/endian/conversion.hpp"
 #include "boost/smart_ptr/intrusive_ptr.hpp"
 #include "boost/smart_ptr/intrusive_ref_counter.hpp"
 #include "net/shadowsocks/wire-structs.h"
@@ -57,11 +58,9 @@ TcpServer::TcpServer(
     const any_io_executor &executor,
     const tcp::endpoint &endpoint,
     const MasterKey &master_key,
-    SaltFilter &salt_filter,
     const Options &options)
     : executor_(executor),
       master_key_(master_key),
-      salt_filter_(salt_filter),
       options_(options),
       acceptor_(executor_, endpoint),
       resolver_(executor_) {
@@ -79,7 +78,8 @@ TcpServer::Connection::Connection(TcpServer &server)
       remote_socket_(server_.executor_),
       timer_(server_.executor_),
       backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)),
-      encrypted_stream_(socket_, server_.master_key_, server_.salt_filter_) {}
+      encrypted_stream_(
+          socket_, server_.master_key_, server_.options_.salt_filter) {}
 
 void TcpServer::Connection::accept() {
     server_.acceptor_.async_accept(
@@ -143,7 +143,7 @@ void TcpServer::Connection::forward_parse(absl::Span<const uint8_t> chunk) {
             std::array<tcp::endpoint, 1>{{
                 tcp::endpoint(
                     address_v4(header->ipv4_address),
-                    (chunk[5]) << 8 | chunk[6])}},
+                    boost::endian::load_big_u16(&chunk[5]))}},
             chunk.subspan(7));
         break;
     case wire::AddressType::host:
@@ -158,7 +158,7 @@ void TcpServer::Connection::forward_parse(absl::Span<const uint8_t> chunk) {
         }
         forward_resolve(
             {reinterpret_cast<const char *>(&chunk[2]), host_length},
-            (chunk[host_length + 2]) << 8 | chunk[host_length + 3],
+            boost::endian::load_big_u16(&chunk[host_length + 2]),
             chunk.subspan(host_length + 4));
         break;
     case wire::AddressType::ipv6:
@@ -170,7 +170,7 @@ void TcpServer::Connection::forward_parse(absl::Span<const uint8_t> chunk) {
             std::array<tcp::endpoint, 1>{{
                 tcp::endpoint(
                     address_v6(header->ipv6_address),
-                    (chunk[17]) << 8 | chunk[18])}},
+                    boost::endian::load_big_u16(&chunk[17]))}},
             chunk.subspan(19));
         break;
     default:

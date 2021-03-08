@@ -5,6 +5,7 @@
 
 #include "net/asio.h"
 #include "net/shadowsocks/encryption.h"
+#include "net/timer-list.h"
 
 namespace net {
 namespace shadowsocks {
@@ -35,6 +36,7 @@ private:
     Options options_;
     tcp::acceptor acceptor_;
     tcp::resolver resolver_;
+    TimerList timer_list_;
 };
 
 }  // namespace shadowsocks

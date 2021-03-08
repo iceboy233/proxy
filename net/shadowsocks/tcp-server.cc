@@ -47,7 +47,7 @@ private:
     TcpServer &server_;
     tcp::socket socket_;
     tcp::socket remote_socket_;
-    steady_timer timer_;
+    TimerList::Timer timer_;
     std::unique_ptr<uint8_t[]> backward_buffer_;
     static constexpr size_t backward_buffer_size_ = 16383;
     size_t backward_read_size_;
@@ -63,7 +63,8 @@ TcpServer::TcpServer(
       master_key_(master_key),
       options_(options),
       acceptor_(executor_, endpoint),
-      resolver_(executor_) {
+      resolver_(executor_),
+      timer_list_(executor_, options_.connection_timeout) {
     accept();
 }
 
@@ -76,7 +77,7 @@ TcpServer::Connection::Connection(TcpServer &server)
     : server_(server),
       socket_(server_.executor_),
       remote_socket_(server_.executor_),
-      timer_(server_.executor_),
+      timer_(server_.timer_list_),
       backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)),
       encrypted_stream_(
           socket_, server_.master_key_, server_.options_.salt_filter) {}
@@ -270,15 +271,14 @@ void TcpServer::Connection::wait() {
         std::chrono::nanoseconds::zero()) {
         return;
     }
-    timer_.expires_after(server_.options_.connection_timeout);
-    timer_.async_wait(
-        [connection = boost::intrusive_ptr<Connection>(this)](
-            std::error_code ec) {
-            if (ec) {
-                return;
-            }
-            connection->close();
-        });
+    timer_.set();
+    timer_.wait([connection = boost::intrusive_ptr<Connection>(this)](
+        bool cancelled) {
+        if (cancelled) {
+            return;
+        }
+        connection->close();
+    });
 }
 
 void TcpServer::Connection::close() {

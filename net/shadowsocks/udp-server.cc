@@ -37,7 +37,7 @@ private:
     udp::endpoint client_endpoint_;
     bool is_v6_;
     udp::socket remote_socket_;
-    steady_timer timer_;
+    TimerList::Timer timer_;
     std::unique_ptr<uint8_t[]> backward_buffer_;
     static constexpr size_t backward_buffer_size_ = 65535 - 48;
     udp::endpoint backward_receive_endpoint_;
@@ -53,7 +53,8 @@ UdpServer::UdpServer(
     : executor_(executor),
       options_(options),
       socket_(executor, endpoint),
-      encrypted_datagram_(socket_, master_key, options_.salt_filter) {
+      encrypted_datagram_(socket_, master_key, options_.salt_filter),
+      timer_list_(executor_, options_.connection_timeout) {
     forward_receive();
 }
 
@@ -131,7 +132,7 @@ UdpServer::Connection::Connection(
       client_endpoint_(client_endpoint),
       is_v6_(is_v6),
       remote_socket_(server_.executor_, {!is_v6_ ? udp::v4() : udp::v6(), 0}),
-      timer_(server_.executor_),
+      timer_(server_.timer_list_),
       backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)) {
     server_.connections_.emplace(
         std::make_tuple(client_endpoint_, is_v6_), this);
@@ -211,17 +212,15 @@ void UdpServer::Connection::wait() {
         std::chrono::nanoseconds::zero()) {
         return;
     }
-    timer_.expires_after(server_.options_.connection_timeout);
-    timer_.async_wait(
-        [connection = boost::intrusive_ptr<Connection>(this)](
-            std::error_code ec) {
-            if (ec) {
-                return;
-            }
-            connection->close();
-        });
+    timer_.set();
+    timer_.wait([connection = boost::intrusive_ptr<Connection>(this)](
+        bool cancelled) {
+        if (cancelled) {
+            return;
+        }
+        connection->close();
+    });
 }
-
 
 void UdpServer::Connection::close() {
     timer_.cancel();

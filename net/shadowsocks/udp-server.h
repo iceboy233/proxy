@@ -10,6 +10,7 @@
 #include "net/asio.h"
 #include "net/asio-hash.h"
 #include "net/shadowsocks/encryption.h"
+#include "net/timer-list.h"
 
 namespace net {
 namespace shadowsocks {
@@ -43,6 +44,7 @@ private:
     Options options_;
     udp::socket socket_;
     EncryptedDatagram encrypted_datagram_;
+    TimerList timer_list_;
     absl::flat_hash_map<std::tuple<udp::endpoint, bool>, Connection *>
         connections_;
     udp::endpoint receive_endpoint_;

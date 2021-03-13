@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <system_error>
 
@@ -27,17 +28,18 @@ public:
     void forward_send(
         absl::Span<const uint8_t> chunk, const udp::endpoint &endpoint);
     void backward_receive();
-    void wait();
+    void set_timer();
 
 private:
     void backward_send();
+    void update_timer();
     void close();
 
     UdpServer &server_;
     udp::endpoint client_endpoint_;
     bool is_v6_;
     udp::socket remote_socket_;
-    TimerList::Timer timer_;
+    std::optional<TimerList::Timer> timer_;
     std::unique_ptr<uint8_t[]> backward_buffer_;
     static constexpr size_t backward_buffer_size_ = 65535 - 48;
     udp::endpoint backward_receive_endpoint_;
@@ -120,7 +122,7 @@ void UdpServer::forward_dispatch(
             *this, receive_endpoint_, server_endpoint.address().is_v6()));
         connection->forward_send(chunk, server_endpoint);
         connection->backward_receive();
-        connection->wait();
+        connection->set_timer();
     }
 }
 
@@ -132,7 +134,6 @@ UdpServer::Connection::Connection(
       client_endpoint_(client_endpoint),
       is_v6_(is_v6),
       remote_socket_(server_.executor_, {!is_v6_ ? udp::v4() : udp::v6(), 0}),
-      timer_(server_.timer_list_),
       backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)) {
     server_.connections_.emplace(
         std::make_tuple(client_endpoint_, is_v6_), this);
@@ -150,7 +151,7 @@ void UdpServer::Connection::forward_send(
         [connection = boost::intrusive_ptr<Connection>(this)](
             std::error_code, size_t) {
             connection->server_.forward_receive();
-            connection->wait();
+            connection->update_timer();
         });
 }
 
@@ -168,7 +169,7 @@ void UdpServer::Connection::backward_receive() {
             }
             connection->backward_receive_size_ = size;
             connection->backward_send();
-            connection->wait();
+            connection->update_timer();
         });
 }
 
@@ -203,27 +204,31 @@ void UdpServer::Connection::backward_send() {
                 return;
             }
             connection->backward_receive();
-            connection->wait();
+            connection->update_timer();
         });
 }
 
-void UdpServer::Connection::wait() {
+void UdpServer::Connection::set_timer() {
     if (server_.options_.connection_timeout ==
         std::chrono::nanoseconds::zero()) {
         return;
     }
-    timer_.set();
-    timer_.wait([connection = boost::intrusive_ptr<Connection>(this)](
-        bool cancelled) {
-        if (cancelled) {
-            return;
-        }
-        connection->close();
-    });
+    timer_.emplace(
+        server_.timer_list_,
+        [connection = boost::intrusive_ptr<Connection>(this)]() {
+            connection->close();
+        });
+}
+
+void UdpServer::Connection::update_timer() {
+    if (!timer_) {
+        return;
+    }
+    timer_->update();
 }
 
 void UdpServer::Connection::close() {
-    timer_.cancel();
+    timer_.reset();
     remote_socket_.close();
 }
 

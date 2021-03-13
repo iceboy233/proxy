@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <system_error>
 
@@ -41,13 +42,14 @@ private:
     void forward_write(absl::Span<const uint8_t> chunk);
     void backward_read();
     void backward_write();
-    void wait();
+    void set_timer();
+    void update_timer();
     void close();
 
     TcpServer &server_;
     tcp::socket socket_;
     tcp::socket remote_socket_;
-    TimerList::Timer timer_;
+    std::optional<TimerList::Timer> timer_;
     std::unique_ptr<uint8_t[]> backward_buffer_;
     static constexpr size_t backward_buffer_size_ = 16383;
     size_t backward_read_size_;
@@ -77,7 +79,6 @@ TcpServer::Connection::Connection(TcpServer &server)
     : server_(server),
       socket_(server_.executor_),
       remote_socket_(server_.executor_),
-      timer_(server_.timer_list_),
       backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)),
       encrypted_stream_(
           socket_, server_.master_key_, server_.options_.salt_filter) {}
@@ -94,7 +95,7 @@ void TcpServer::Connection::accept() {
             }
             connection->socket_.set_option(tcp::no_delay(true));
             connection->forward_read();
-            connection->wait();
+            connection->set_timer();
             connection->server_.accept();
         });
 }
@@ -108,7 +109,7 @@ void TcpServer::Connection::forward_read() {
                 return;
             }
             connection->forward_parse(chunk);
-            connection->wait();
+            connection->update_timer();
         });
 }
 
@@ -121,7 +122,7 @@ void TcpServer::Connection::forward_read_tail() {
                 return;
             }
             connection->forward_write(chunk);
-            connection->wait();
+            connection->update_timer();
         });
 }
 
@@ -194,7 +195,7 @@ void TcpServer::Connection::forward_resolve(
                 return;
             }
             connection->forward_connect(endpoints, initial_chunk);
-            connection->wait();
+            connection->update_timer();
         });
 }
 
@@ -218,7 +219,7 @@ void TcpServer::Connection::forward_connect(
                 connection->forward_read_tail();
             }
             connection->backward_read();
-            connection->wait();
+            connection->update_timer();
         });
 }
 
@@ -233,7 +234,7 @@ void TcpServer::Connection::forward_write(absl::Span<const uint8_t> chunk) {
                 return;
             }
             connection->forward_read_tail();
-            connection->wait();
+            connection->update_timer();
         });
 }
 
@@ -248,7 +249,7 @@ void TcpServer::Connection::backward_read() {
             }
             connection->backward_read_size_ = size;
             connection->backward_write();
-            connection->wait();
+            connection->update_timer();
         });
 }
 
@@ -262,27 +263,31 @@ void TcpServer::Connection::backward_write() {
                 return;
             }
             connection->backward_read();
-            connection->wait();
+            connection->update_timer();
         });
 }
 
-void TcpServer::Connection::wait() {
+void TcpServer::Connection::set_timer() {
     if (server_.options_.connection_timeout ==
         std::chrono::nanoseconds::zero()) {
         return;
     }
-    timer_.set();
-    timer_.wait([connection = boost::intrusive_ptr<Connection>(this)](
-        bool cancelled) {
-        if (cancelled) {
-            return;
-        }
-        connection->close();
-    });
+    timer_.emplace(
+        server_.timer_list_,
+        [connection = boost::intrusive_ptr<Connection>(this)]() {
+            connection->close();
+        });
+}
+
+void TcpServer::Connection::update_timer() {
+    if (!timer_) {
+        return;
+    }
+    timer_->update();
 }
 
 void TcpServer::Connection::close() {
-    timer_.cancel();
+    timer_.reset();
     remote_socket_.close();
     socket_.close();
 }

@@ -2,14 +2,16 @@
 #define _NET_SHADOWSOCKS_ENCRYPTION_H
 
 #include <openssl/aead.h>
+#include <openssl/rand.h>
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <optional>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <boost/endian/arithmetic.hpp>
+#include <boost/endian/conversion.hpp>
 
 #include "absl/types/span.h"
 #include "net/asio.h"
@@ -81,34 +83,31 @@ public:
         const MasterKey &master_key,
         SaltFilter *salt_filter);
 
-    void read(
-        std::function<void(
-            std::error_code, absl::Span<const uint8_t>)> callback);
-    void write(
-        absl::Span<const uint8_t> chunk,
-        std::function<void(std::error_code)> callback);
+    template <typename CallbackT>
+    void read(CallbackT &&callback);
+
+    template <typename CallbackT>
+    void write(absl::Span<const uint8_t> chunk, CallbackT &&callback);
 
 private:
-    void read_header(
-        std::function<void(
-            std::error_code, absl::Span<const uint8_t>)> callback);
-    void read_length(
-        std::function<void(
-            std::error_code, absl::Span<const uint8_t>)> callback);
-    void read_payload(
-        size_t length,
-        std::function<void(
-            std::error_code, absl::Span<const uint8_t>)> callback);
-    void write_header(
-        absl::Span<const uint8_t> chunk,
-        std::function<void(std::error_code)> callback);
+    template <typename CallbackT>
+    void read_header(CallbackT &&callback);
+
+    template <typename CallbackT>
+    void read_length(CallbackT &&callback);
+
+    template <typename CallbackT>
+    void read_payload(size_t length, CallbackT &&callback);
+
+    template <typename CallbackT>
+    void write_header(absl::Span<const uint8_t> chunk, CallbackT &&callback);
+
+    template <typename CallbackT>
     void write_length(
-        absl::Span<const uint8_t> chunk,
-        size_t offset,
-        std::function<void(std::error_code)> callback);
-    void write_payload(
-        size_t size,
-        std::function<void(std::error_code)> callback);
+        absl::Span<const uint8_t> chunk, size_t offset, CallbackT &&callback);
+
+    template <typename CallbackT>
+    void write_payload(size_t size, CallbackT &&callback);
 
     tcp::socket &socket_;
     const MasterKey &master_key_;
@@ -129,14 +128,14 @@ public:
         const MasterKey &master_key,
         SaltFilter *salt_filter);
 
-    void receive_from(
-        udp::endpoint &endpoint,
-        std::function<void(
-            std::error_code, absl::Span<const uint8_t>)> callback);
+    template <typename CallbackT>
+    void receive_from(udp::endpoint &endpoint, CallbackT &&callback);
+
+    template <typename CallbackT>
     void send_to(
         absl::Span<const uint8_t> chunk,
         const udp::endpoint &endpoint,
-        std::function<void(std::error_code)> callback);
+        CallbackT &&callback);
 
 private:
     udp::socket &socket_;
@@ -147,6 +146,193 @@ private:
     std::unique_ptr<uint8_t[]> write_buffer_;
     static constexpr size_t write_buffer_size_ = 65535;
 };
+
+template <typename CallbackT>
+void EncryptedStream::read(CallbackT &&callback) {
+    if (!read_key_) {
+        read_header(std::forward<CallbackT>(callback));
+    } else {
+        read_length(std::forward<CallbackT>(callback));
+    }
+}
+
+template <typename CallbackT>
+void EncryptedStream::write(
+    absl::Span<const uint8_t> chunk, CallbackT &&callback) {
+    if (!write_key_) {
+        write_header(chunk, std::forward<CallbackT>(callback));
+    } else {
+        write_length(chunk, 0, std::forward<CallbackT>(callback));
+    }
+}
+
+template <typename CallbackT>
+void EncryptedStream::read_header(CallbackT &&callback) {
+    async_read(
+        socket_,
+        buffer(&read_buffer_[0], master_key_.method().salt_size),
+        [this, callback = std::forward<CallbackT>(callback)](
+            std::error_code ec, size_t) mutable {
+            if (ec) {
+                callback(ec, {});
+                return;
+            }
+            read_key_.emplace(master_key_, &read_buffer_[0]);
+            read_length(std::forward<CallbackT>(callback));
+        });
+}
+
+template <typename CallbackT>
+void EncryptedStream::read_length(CallbackT &&callback) {
+    async_read(
+        socket_,
+        buffer(&read_buffer_[32], 18),
+        [this, callback = std::forward<CallbackT>(callback)](
+            std::error_code ec, size_t) mutable {
+            if (ec) {
+                callback(ec, {});
+                return;
+            }
+            if (!read_key_->decrypt(
+                {&read_buffer_[32], 2}, &read_buffer_[34], &read_buffer_[32])) {
+                callback(
+                    std::make_error_code(std::errc::result_out_of_range), {});
+                return;
+            }
+            if (salt_filter_ && !read_key_allowed_) {
+                if (!salt_filter_->test_and_insert(
+                    {&read_buffer_[0], master_key_.method().salt_size})) {
+                    callback(
+                        std::make_error_code(std::errc::result_out_of_range),
+                        {});
+                    return;
+                }
+                read_key_allowed_ = true;
+            }
+            size_t length = boost::endian::load_big_u16(&read_buffer_[32]);
+            if (length >= 16384) {
+                callback(
+                    std::make_error_code(std::errc::result_out_of_range), {});
+                return;
+            }
+            read_payload(length, std::forward<CallbackT>(callback));
+        });
+}
+
+template <typename CallbackT>
+void EncryptedStream::read_payload(size_t length, CallbackT &&callback) {
+    async_read(
+        socket_,
+        buffer(&read_buffer_[0], length + 16),
+        [this, length, callback = std::forward<CallbackT>(callback)](
+            std::error_code ec, size_t) {
+            if (ec) {
+                callback(ec, {});
+                return;
+            }
+            if (!read_key_->decrypt(
+                {&read_buffer_[0], length}, &read_buffer_[length],
+                &read_buffer_[0])) {
+                callback(
+                    std::make_error_code(std::errc::result_out_of_range), {});
+                return;
+            }
+            callback({}, {&read_buffer_[0], length});
+        });
+}
+
+template <typename CallbackT>
+void EncryptedStream::write_header(
+    absl::Span<const uint8_t> chunk, CallbackT &&callback) {
+    const size_t salt_size = master_key_.method().salt_size;
+    RAND_bytes(&write_buffer_[0], salt_size);
+    write_key_.emplace(master_key_, &write_buffer_[0]);
+    write_length(chunk, salt_size, std::forward<CallbackT>(callback));
+}
+
+template <typename CallbackT>
+void EncryptedStream::write_length(
+    absl::Span<const uint8_t> chunk, size_t offset, CallbackT &&callback) {
+    write_buffer_[offset] = static_cast<uint8_t>(chunk.size() >> 8);
+    write_buffer_[offset + 1] = static_cast<uint8_t>(chunk.size());
+    write_key_->encrypt(
+        {&write_buffer_[offset], 2},
+        &write_buffer_[offset], &write_buffer_[offset + 2]);
+    write_key_->encrypt(
+        chunk,
+        &write_buffer_[offset + 18],
+        &write_buffer_[offset + 18 + chunk.size()]);
+    write_payload(
+        offset + chunk.size() + 34, std::forward<CallbackT>(callback));
+}
+
+template <typename CallbackT>
+void EncryptedStream::write_payload(size_t size, CallbackT &&callback) {
+    async_write(
+        socket_,
+        buffer(&write_buffer_[0], size),
+        [callback = std::forward<CallbackT>(callback)](
+            std::error_code ec, size_t) {
+            callback(ec);
+        });
+}
+
+template <typename CallbackT>
+void EncryptedDatagram::receive_from(
+    udp::endpoint &endpoint, CallbackT &&callback) {
+    socket_.async_receive_from(
+        buffer(read_buffer_.get(), read_buffer_size_),
+        endpoint,
+        [this, callback = std::forward<CallbackT>(callback)](
+            std::error_code ec, size_t size) {
+            if (ec) {
+                callback(ec, {});
+                return;
+            }
+            size_t salt_size = master_key_.method().salt_size;
+            size_t payload_len = size - salt_size - 16;
+            SessionKey read_key(master_key_, read_buffer_.get());
+            if (!read_key.decrypt(
+                {&read_buffer_[salt_size], payload_len},
+                &read_buffer_[size - 16],
+                &read_buffer_[salt_size])) {
+                callback(
+                    std::make_error_code(std::errc::result_out_of_range),
+                    {});
+                return;
+            }
+            if (salt_filter_) {
+                if (!salt_filter_->test_and_insert(
+                    {&read_buffer_[0], master_key_.method().salt_size})) {
+                    callback(
+                        std::make_error_code(std::errc::result_out_of_range),
+                        {});
+                    return;
+                }
+            }
+            callback({}, {&read_buffer_[salt_size], payload_len});
+        });
+}
+
+template <typename CallbackT>
+void EncryptedDatagram::send_to(
+    absl::Span<const uint8_t> chunk,
+    const udp::endpoint &endpoint,
+    CallbackT &&callback) {
+    const size_t salt_size = master_key_.method().salt_size;
+    RAND_bytes(write_buffer_.get(), salt_size);
+    SessionKey write_key(master_key_, write_buffer_.get());
+    write_key.encrypt(
+        chunk, &write_buffer_[salt_size],
+        &write_buffer_[salt_size + chunk.size()]);
+    socket_.async_send_to(
+        buffer(write_buffer_.get(), salt_size + chunk.size() + 16),
+        endpoint,
+        [this, callback = std::forward<CallbackT>(callback)](
+            std::error_code ec, size_t) {
+            callback(ec);
+        });
+}
 
 }  // namespace shadowsocks
 }  // namespace net

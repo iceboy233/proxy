@@ -4,7 +4,6 @@
 #include <openssl/evp.h>
 #include <openssl/hkdf.h>
 #include <openssl/md5.h>
-#include <openssl/rand.h>
 #include <openssl/siphash.h>
 #include <cstdlib>
 
@@ -124,137 +123,6 @@ EncryptedStream::EncryptedStream(
       read_buffer_(std::make_unique<uint8_t[]>(read_buffer_size_)),
       write_buffer_(std::make_unique<uint8_t[]>(write_buffer_size_)) {}
 
-void EncryptedStream::read(
-    std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
-    if (!read_key_) {
-        read_header(std::move(callback));
-    } else {
-        read_length(std::move(callback));
-    }
-}
-
-void EncryptedStream::write(
-    absl::Span<const uint8_t> chunk,
-    std::function<void(std::error_code)> callback) {
-    if (!write_key_) {
-        write_header(chunk, std::move(callback));
-    } else {
-        write_length(chunk, 0, std::move(callback));
-    }
-}
-
-void EncryptedStream::read_header(
-    std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
-    async_read(
-        socket_,
-        buffer(&read_buffer_[0], master_key_.method().salt_size),
-        [this, callback = std::move(callback)](
-            std::error_code ec, size_t) mutable {
-            if (ec) {
-                callback(ec, {});
-                return;
-            }
-            read_key_.emplace(master_key_, &read_buffer_[0]);
-            read_length(std::move(callback));
-        });
-}
-
-void EncryptedStream::read_length(
-    std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
-    async_read(
-        socket_,
-        buffer(&read_buffer_[32], 18),
-        [this, callback = std::move(callback)](
-            std::error_code ec, size_t) mutable {
-            if (ec) {
-                callback(ec, {});
-                return;
-            }
-            if (!read_key_->decrypt(
-                {&read_buffer_[32], 2}, &read_buffer_[34], &read_buffer_[32])) {
-                callback(
-                    std::make_error_code(std::errc::result_out_of_range), {});
-                return;
-            }
-            if (salt_filter_ && !read_key_allowed_) {
-                if (!salt_filter_->test_and_insert(
-                    {&read_buffer_[0], master_key_.method().salt_size})) {
-                    callback(
-                        std::make_error_code(std::errc::result_out_of_range),
-                        {});
-                    return;
-                }
-                read_key_allowed_ = true;
-            }
-            size_t length = (read_buffer_[32] << 8) | read_buffer_[33];
-            if (length >= 16384) {
-                callback(
-                    std::make_error_code(std::errc::result_out_of_range), {});
-                return;
-            }
-            read_payload(length, std::move(callback));
-        });
-}
-
-void EncryptedStream::read_payload(
-    size_t length,
-    std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
-    async_read(
-        socket_,
-        buffer(&read_buffer_[0], length + 16),
-        [this, length, callback = std::move(callback)](
-            std::error_code ec, size_t) {
-            if (ec) {
-                callback(ec, {});
-                return;
-            }
-            if (!read_key_->decrypt(
-                {&read_buffer_[0], length}, &read_buffer_[length],
-                &read_buffer_[0])) {
-                callback(
-                    std::make_error_code(std::errc::result_out_of_range), {});
-                return;
-            }
-            callback({}, {&read_buffer_[0], length});
-        });
-}
-
-void EncryptedStream::write_header(
-    absl::Span<const uint8_t> chunk,
-    std::function<void(std::error_code)> callback) {
-    const size_t salt_size = master_key_.method().salt_size;
-    RAND_bytes(&write_buffer_[0], salt_size);
-    write_key_.emplace(master_key_, &write_buffer_[0]);
-    write_length(chunk, salt_size, std::move(callback));
-}
-
-void EncryptedStream::write_length(
-    absl::Span<const uint8_t> chunk,
-    size_t offset,
-    std::function<void(std::error_code)> callback) {
-    write_buffer_[offset] = static_cast<uint8_t>(chunk.size() >> 8);
-    write_buffer_[offset + 1] = static_cast<uint8_t>(chunk.size());
-    write_key_->encrypt(
-        {&write_buffer_[offset], 2},
-        &write_buffer_[offset], &write_buffer_[offset + 2]);
-    write_key_->encrypt(
-        chunk,
-        &write_buffer_[offset + 18],
-        &write_buffer_[offset + 18 + chunk.size()]);
-    write_payload(offset + chunk.size() + 34, std::move(callback));
-}
-
-void EncryptedStream::write_payload(
-    size_t size,
-    std::function<void(std::error_code)> callback) {
-    async_write(
-        socket_,
-        buffer(&write_buffer_[0], size),
-        [callback = std::move(callback)](std::error_code ec, size_t) {
-            callback(ec);
-        });
-}
-
 EncryptedDatagram::EncryptedDatagram(
     udp::socket &socket, const MasterKey &master_key, SaltFilter *salt_filter)
     : socket_(socket),
@@ -262,60 +130,6 @@ EncryptedDatagram::EncryptedDatagram(
       salt_filter_(salt_filter),
       read_buffer_(std::make_unique<uint8_t[]>(read_buffer_size_)),
       write_buffer_(std::make_unique<uint8_t[]>(write_buffer_size_)) {}
-
-void EncryptedDatagram::receive_from(
-    udp::endpoint &endpoint,
-    std::function<void(std::error_code, absl::Span<const uint8_t>)> callback) {
-    socket_.async_receive_from(
-        buffer(read_buffer_.get(), read_buffer_size_),
-        endpoint,
-        [this, callback = std::move(callback)](
-            std::error_code ec, size_t size) {
-            if (ec) {
-                callback(ec, {});
-                return;
-            }
-            size_t salt_size = master_key_.method().salt_size;
-            size_t payload_len = size - salt_size - 16;
-            SessionKey read_key(master_key_, read_buffer_.get());
-            if (!read_key.decrypt(
-                {&read_buffer_[salt_size], payload_len},
-                &read_buffer_[size - 16],
-                &read_buffer_[salt_size])) {
-                callback(
-                    std::make_error_code(std::errc::result_out_of_range),
-                    {});
-                return;
-            }
-            if (salt_filter_) {
-                if (!salt_filter_->test_and_insert(
-                    {&read_buffer_[0], master_key_.method().salt_size})) {
-                    callback(
-                        std::make_error_code(std::errc::result_out_of_range),
-                        {});
-                    return;
-                }
-            }
-            callback({}, {&read_buffer_[salt_size], payload_len});
-        });
-}
-
-void EncryptedDatagram::send_to(
-    absl::Span<const uint8_t> chunk, const udp::endpoint &endpoint,
-    std::function<void(std::error_code)> callback) {
-    const size_t salt_size = master_key_.method().salt_size;
-    RAND_bytes(write_buffer_.get(), salt_size);
-    SessionKey write_key(master_key_, write_buffer_.get());
-    write_key.encrypt(
-        chunk, &write_buffer_[salt_size],
-        &write_buffer_[salt_size + chunk.size()]);
-    socket_.async_send_to(
-        buffer(write_buffer_.get(), salt_size + chunk.size() + 16),
-        endpoint,
-        [this, callback = std::move(callback)](std::error_code ec, size_t) {
-            callback(ec);
-        });
-}
 
 }  // namespace shadowsocks
 }  // namespace net

@@ -98,20 +98,22 @@ bool SessionKey::decrypt(
 }
 
 SaltFilter::SaltFilter()
-    : current_(&filters_[0]) {
+    : filter0_(262144),
+      filter1_(262144) {
     RAND_bytes(reinterpret_cast<uint8_t *>(key_.data()), sizeof(key_));
 }
 
 bool SaltFilter::test_and_insert(absl::Span<const uint8_t> salt) {
     uint64_t fingerprint = SIPHASH_24(key_.data(), salt.data(), salt.size());
-    if (filters_[0].test(fingerprint) || filters_[1].test(fingerprint)) {
+    if (filter0_.test(fingerprint) || filter1_.test(fingerprint)) {
         return false;
     }
-    if (current_->size() >= 800000) {
-        current_ = current_ == &filters_[0] ? &filters_[1] : &filters_[0];
-        current_->clear();
+    if (filter0_.size() >= 800000) {
+        using std::swap;
+        swap(filter0_, filter1_);
+        filter0_.clear();
     }
-    current_->insert(fingerprint);
+    filter0_.insert(fingerprint);
     return true;
 }
 

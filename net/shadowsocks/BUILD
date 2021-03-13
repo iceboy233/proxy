@@ -5,7 +5,6 @@ cc_library(
     srcs = ["encryption.cc"],
     hdrs = ["encryption.h"],
     deps = [
-        ":hash-filter",
         "@boringssl//:crypto",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
@@ -13,6 +12,7 @@ cc_library(
         "@org_iceboy_trunk//base:flags",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//util:hash-filter",
     ],
 )
 

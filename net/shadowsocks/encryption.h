@@ -15,7 +15,7 @@
 
 #include "absl/types/span.h"
 #include "net/asio.h"
-#include "net/shadowsocks/hash-filter.h"
+#include "util/hash-filter.h"
 
 namespace net {
 namespace shadowsocks {
@@ -71,8 +71,8 @@ public:
     bool test_and_insert(absl::Span<const uint8_t> salt);
 
 private:
-    HashFilter *current_;
-    std::array<HashFilter, 2> filters_;
+    util::HashFilter32 filter0_;
+    util::HashFilter32 filter1_;
     std::array<uint64_t, 2> key_;
 };
 

@@ -14,7 +14,6 @@
 #include <boost/endian/conversion.hpp>
 
 #include "absl/types/span.h"
-#include "base/logging.h"
 #include "net/asio.h"
 #include "util/hash-filter.h"
 
@@ -193,20 +192,17 @@ void EncryptedStream::read_header(CallbackT &&callback) {
             if (!read_key_->decrypt(
                 {&data[salt_size], 2}, &data[salt_size + 2],
                 &data[salt_size])) {
-                callback(
-                    std::make_error_code(std::errc::result_out_of_range), {});
+                callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
             if (salt_filter_ &&
                 !salt_filter_->test_and_insert({data, salt_size})) {
-                callback(
-                    std::make_error_code(std::errc::result_out_of_range), {});
+                callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
             size_t length = boost::endian::load_big_u16(&data[salt_size]);
             if (length >= 16384) {
-                callback(
-                    std::make_error_code(std::errc::result_out_of_range), {});
+                callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
             read_payload(length, std::forward<CallbackT>(callback));
@@ -224,14 +220,12 @@ void EncryptedStream::read_length(CallbackT &&callback) {
                 return;
             }
             if (!read_key_->decrypt({data, 2}, &data[2], data)) {
-                callback(
-                    std::make_error_code(std::errc::result_out_of_range), {});
+                callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
             size_t length = boost::endian::load_big_u16(data);
             if (length >= 16384) {
-                callback(
-                    std::make_error_code(std::errc::result_out_of_range), {});
+                callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
             read_payload(length, std::forward<CallbackT>(callback));
@@ -243,14 +237,13 @@ void EncryptedStream::read_payload(size_t length, CallbackT &&callback) {
     buffered_read(
         length + 16,
         [this, length, callback = std::forward<CallbackT>(callback)](
-            std::error_code ec, uint8_t *data) {
+            std::error_code ec, uint8_t *data) mutable {
             if (ec) {
                 callback(ec, {});
                 return;
             }
             if (!read_key_->decrypt({data, length}, &data[length], data)) {
-                callback(
-                    std::make_error_code(std::errc::result_out_of_range), {});
+                callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
             callback({}, {data, length});
@@ -279,7 +272,7 @@ void EncryptedStream::buffered_read(size_t size, CallbackT &&callback) {
         buffer(
             &read_buffer_[read_buffer_end_],
             read_buffer_size_ - read_buffer_end_),
-        transfer_at_least(size - read_buffer_end_),
+        transfer_at_least(size - remaining_size),
         [this, size, callback = std::forward<CallbackT>(callback)](
             std::error_code ec, size_t transferred_size) mutable {
             read_buffer_start_ += size;
@@ -295,7 +288,7 @@ void EncryptedDatagram::receive_from(
         buffer(read_buffer_.get(), read_buffer_size_),
         endpoint,
         [this, callback = std::forward<CallbackT>(callback)](
-            std::error_code ec, size_t size) {
+            std::error_code ec, size_t size) mutable {
             if (ec) {
                 callback(ec, {});
                 return;
@@ -307,14 +300,12 @@ void EncryptedDatagram::receive_from(
                 {&read_buffer_[salt_size], payload_len},
                 &read_buffer_[size - 16],
                 &read_buffer_[salt_size])) {
-                callback(
-                    std::make_error_code(std::errc::result_out_of_range), {});
+                callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
             if (salt_filter_ &&
                 !salt_filter_->test_and_insert({&read_buffer_[0], salt_size})) {
-                callback(
-                    std::make_error_code(std::errc::result_out_of_range), {});
+                callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
             callback({}, {&read_buffer_[salt_size], payload_len});
@@ -336,7 +327,7 @@ void EncryptedDatagram::send_to(
         buffer(write_buffer_.get(), salt_size + chunk.size() + 16),
         endpoint,
         [this, callback = std::forward<CallbackT>(callback)](
-            std::error_code ec, size_t) {
+            std::error_code ec, size_t) mutable {
             callback(ec);
         });
 }

@@ -7,7 +7,6 @@
 #include <openssl/siphash.h>
 #include <cstdlib>
 
-#include "base/flags.h"
 #include "base/logging.h"
 
 namespace net {

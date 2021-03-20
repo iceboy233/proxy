@@ -9,7 +9,6 @@ cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@org_boost_boost//:endian",
-        "@org_iceboy_trunk//base:flags",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:asio",
         "@org_iceboy_trunk//util:hash-filter",

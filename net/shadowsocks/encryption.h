@@ -69,8 +69,11 @@ class SaltFilter {
 public:
     SaltFilter();
     bool test_and_insert(absl::Span<const uint8_t> salt);
+    void insert(absl::Span<const uint8_t> salt);
 
 private:
+    void insert(uint64_t fingerprint);
+
     util::HashFilter32 filter0_;
     util::HashFilter32 filter1_;
     std::array<uint64_t, 2> key_;
@@ -157,6 +160,9 @@ void EncryptedStream::write(
     if (!write_key_) {
         const size_t salt_size = master_key_.method().salt_size;
         RAND_bytes(&write_buffer_[0], salt_size);
+        if (salt_filter_) {
+            salt_filter_->insert({&write_buffer_[0], salt_size});
+        }
         write_key_.emplace(master_key_, &write_buffer_[0]);
         offset = salt_size;
     }
@@ -285,7 +291,7 @@ template <typename CallbackT>
 void EncryptedDatagram::receive_from(
     udp::endpoint &endpoint, CallbackT &&callback) {
     socket_.async_receive_from(
-        buffer(read_buffer_.get(), read_buffer_size_),
+        buffer(&read_buffer_[0], read_buffer_size_),
         endpoint,
         [this, callback = std::forward<CallbackT>(callback)](
             std::error_code ec, size_t size) mutable {
@@ -295,7 +301,7 @@ void EncryptedDatagram::receive_from(
             }
             size_t salt_size = master_key_.method().salt_size;
             size_t payload_len = size - salt_size - 16;
-            SessionKey read_key(master_key_, read_buffer_.get());
+            SessionKey read_key(master_key_, &read_buffer_[0]);
             if (!read_key.decrypt(
                 {&read_buffer_[salt_size], payload_len},
                 &read_buffer_[size - 16],
@@ -318,13 +324,16 @@ void EncryptedDatagram::send_to(
     const udp::endpoint &endpoint,
     CallbackT &&callback) {
     const size_t salt_size = master_key_.method().salt_size;
-    RAND_bytes(write_buffer_.get(), salt_size);
-    SessionKey write_key(master_key_, write_buffer_.get());
+    RAND_bytes(&write_buffer_[0], salt_size);
+    if (salt_filter_) {
+        salt_filter_->insert({&write_buffer_[0], salt_size});
+    }
+    SessionKey write_key(master_key_, &write_buffer_[0]);
     write_key.encrypt(
         chunk, &write_buffer_[salt_size],
         &write_buffer_[salt_size + chunk.size()]);
     socket_.async_send_to(
-        buffer(write_buffer_.get(), salt_size + chunk.size() + 16),
+        buffer(&write_buffer_[0], salt_size + chunk.size() + 16),
         endpoint,
         [this, callback = std::forward<CallbackT>(callback)](
             std::error_code ec, size_t) mutable {

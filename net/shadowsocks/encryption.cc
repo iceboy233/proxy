@@ -13,11 +13,12 @@ namespace net {
 namespace shadowsocks {
 namespace {
 
-const std::array<std::pair<std::string_view, EncryptionMethod>, 4> methods = {{
-    {"aes-128-gcm", {EVP_aead_aes_128_gcm(), 16, 16}},
-    {"aes-192-gcm", {EVP_aead_aes_192_gcm(), 24, 24}},
-    {"aes-256-gcm", {EVP_aead_aes_256_gcm(), 32, 32}},
-    {"chacha20-ietf-poly1305", {EVP_aead_chacha20_poly1305(), 32, 32}},
+const std::array<std::pair<std::string_view, EncryptionMethod>, 5> methods = {{
+    {"aes-128-gcm", {EVP_aead_aes_128_gcm()}},
+    {"aes-192-gcm", {EVP_aead_aes_192_gcm()}},
+    {"aes-256-gcm", {EVP_aead_aes_256_gcm()}},
+    {"chacha20-ietf-poly1305", {EVP_aead_chacha20_poly1305()}},
+    {"xchacha20-ietf-poly1305", {EVP_aead_xchacha20_poly1305()}},
 }};
 
 }  // namespace
@@ -37,7 +38,7 @@ void MasterKey::init_with_password(std::string_view password) {
     MD5_Init(&ctx);
     MD5_Update(&ctx, password.data(), password.size());
     MD5_Final(&key_[0], &ctx);
-    if (method_.key_size > 16) {
+    if (size() > 16) {
         MD5_Init(&ctx);
         MD5_Update(&ctx, &key_[0], 16);
         MD5_Update(&ctx, password.data(), password.size());
@@ -50,14 +51,14 @@ SessionKey::SessionKey(
     const EncryptionMethod &method = master_key.method();
     std::array<uint8_t, 32> key;
     if (!HKDF(
-        key.data(), method.key_size, EVP_sha1(),
-        master_key.data(), master_key.size(), salt, method.salt_size,
+        key.data(), method.key_size(), EVP_sha1(),
+        master_key.data(), master_key.size(), salt, method.key_size(),
         reinterpret_cast<const uint8_t *>("ss-subkey"), 9)) {
         LOG(fatal) << "HKDF failed";
         abort();
     }
     if (!EVP_AEAD_CTX_init(
-        &aead_ctx_, method.aead, key.data(), method.key_size, 16, nullptr)) {
+        &aead_ctx_, method.aead, key.data(), method.key_size(), 16, nullptr)) {
         LOG(fatal) << "EVP_AEAD_CTX_init failed";
         abort();
     }
@@ -72,27 +73,25 @@ void SessionKey::encrypt(
     size_t out_tag_len;
     if (!EVP_AEAD_CTX_seal_scatter(
         &aead_ctx_, out, out_tag, &out_tag_len, 16,
-        reinterpret_cast<uint8_t *>(&nonce_), sizeof(nonce_),
+        reinterpret_cast<uint8_t *>(&nonce_),
+        EVP_AEAD_nonce_length(EVP_AEAD_CTX_aead(&aead_ctx_)),
         in.data(), in.size(), nullptr, 0, nullptr, 0) ||
         out_tag_len != 16) {
         LOG(fatal) << "EVP_AEAD_CTX_seal_scatter failed";
         abort();
     }
-    if (!++nonce_.low) {
-        ++nonce_.high;
-    }
+    ++nonce_[0] || ++nonce_[1] || ++nonce_[2];
 }
 
 bool SessionKey::decrypt(
     absl::Span<const uint8_t> in, const uint8_t in_tag[16], uint8_t *out) {
     if (!EVP_AEAD_CTX_open_gather(
-        &aead_ctx_, out, reinterpret_cast<uint8_t *>(&nonce_), sizeof(nonce_),
+        &aead_ctx_, out, reinterpret_cast<uint8_t *>(&nonce_),
+        EVP_AEAD_nonce_length(EVP_AEAD_CTX_aead(&aead_ctx_)),
         in.data(), in.size(), in_tag, 16, nullptr, 0)) {
         return false;
     }
-    if (!++nonce_.low) {
-        ++nonce_.high;
-    }
+    ++nonce_[0] || ++nonce_[1] || ++nonce_[2];
     return true;
 }
 

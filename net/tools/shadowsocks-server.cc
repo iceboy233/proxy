@@ -17,7 +17,7 @@ DEFINE_FLAG(bool, enable_udp, true, "");
 DEFINE_FLAG(std::string, password, "", "");
 DEFINE_FLAG(std::string, method, "aes-128-gcm",
             "Supported encryption methods: aes-128-gcm, aes-192-gcm, "
-            "aes-256-gcm, chacha20-ietf-poly1305");
+            "aes-256-gcm, chacha20-ietf-poly1305, xchacha20-ietf-poly1305");
 DEFINE_FLAG(bool, detect_salt_reuse, true,
             "Detect salt reuse to prevent replay attacks.");
 DEFINE_FLAG(int, tcp_connection_timeout_secs, 300, "");

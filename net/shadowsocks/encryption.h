@@ -22,10 +22,11 @@ namespace shadowsocks {
 
 struct EncryptionMethod {
     const EVP_AEAD *aead;
-    size_t salt_size;
-    size_t key_size;
 
     static const EncryptionMethod &from_name(std::string_view name);
+
+    size_t key_size() const { return EVP_AEAD_key_length(aead); }
+    size_t nonce_size() const { return EVP_AEAD_nonce_length(aead); }
 };
 
 class MasterKey {
@@ -36,7 +37,7 @@ public:
 
     uint8_t *data() { return key_.data(); }
     const uint8_t *data() const { return key_.data(); }
-    size_t size() const { return method_.key_size; }
+    size_t size() const { return method_.key_size(); }
     const EncryptionMethod &method() const { return method_; }
 
 private:
@@ -55,14 +56,9 @@ public:
         absl::Span<const uint8_t> in, const uint8_t in_tag[16], uint8_t *out);
 
 private:
-    struct Nonce {
-        boost::endian::little_uint64_t low = 0;
-        boost::endian::little_uint32_t high = 0;
-    };
-    static_assert(sizeof(Nonce) == 12);
-
     EVP_AEAD_CTX aead_ctx_;
-    Nonce nonce_;
+    std::array<boost::endian::little_uint64_t, 3> nonce_ = {};
+    static_assert(sizeof(nonce_) == 24);
 };
 
 class SaltFilter {
@@ -158,13 +154,13 @@ void EncryptedStream::write(
     absl::Span<const uint8_t> chunk, CallbackT &&callback) {
     size_t offset = 0;
     if (!write_key_) {
-        const size_t salt_size = master_key_.method().salt_size;
-        RAND_bytes(&write_buffer_[0], salt_size);
+        size_t key_size = master_key_.method().key_size();
+        RAND_bytes(&write_buffer_[0], key_size);
         if (salt_filter_) {
-            salt_filter_->insert({&write_buffer_[0], salt_size});
+            salt_filter_->insert({&write_buffer_[0], key_size});
         }
         write_key_.emplace(master_key_, &write_buffer_[0]);
-        offset = salt_size;
+        offset = key_size;
     }
     boost::endian::store_big_u16(&write_buffer_[offset], chunk.size());
     write_key_->encrypt(
@@ -186,7 +182,7 @@ void EncryptedStream::write(
 template <typename CallbackT>
 void EncryptedStream::read_header(CallbackT &&callback) {
     buffered_read(
-        master_key_.method().salt_size + 18,
+        master_key_.method().key_size() + 18,
         [this, callback = std::forward<CallbackT>(callback)](
             std::error_code ec, uint8_t *data) mutable {
             if (ec) {
@@ -194,19 +190,18 @@ void EncryptedStream::read_header(CallbackT &&callback) {
                 return;
             }
             read_key_.emplace(master_key_, data);
-            const size_t salt_size = master_key_.method().salt_size;
+            size_t key_size = master_key_.method().key_size();
             if (!read_key_->decrypt(
-                {&data[salt_size], 2}, &data[salt_size + 2],
-                &data[salt_size])) {
+                {&data[key_size], 2}, &data[key_size + 2], &data[key_size])) {
                 callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
             if (salt_filter_ &&
-                !salt_filter_->test_and_insert({data, salt_size})) {
+                !salt_filter_->test_and_insert({data, key_size})) {
                 callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
-            size_t length = boost::endian::load_big_u16(&data[salt_size]);
+            size_t length = boost::endian::load_big_u16(&data[key_size]);
             if (length >= 16384) {
                 callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
@@ -299,22 +294,22 @@ void EncryptedDatagram::receive_from(
                 callback(ec, {});
                 return;
             }
-            size_t salt_size = master_key_.method().salt_size;
-            size_t payload_len = size - salt_size - 16;
+            size_t key_size = master_key_.method().key_size();
+            size_t payload_size = size - key_size - 16;
             SessionKey read_key(master_key_, &read_buffer_[0]);
             if (!read_key.decrypt(
-                {&read_buffer_[salt_size], payload_len},
-                &read_buffer_[size - 16],
-                &read_buffer_[salt_size])) {
+                {&read_buffer_[key_size], payload_size},
+                &read_buffer_[key_size + payload_size],
+                &read_buffer_[key_size])) {
                 callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
             if (salt_filter_ &&
-                !salt_filter_->test_and_insert({&read_buffer_[0], salt_size})) {
+                !salt_filter_->test_and_insert({&read_buffer_[0], key_size})) {
                 callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
-            callback({}, {&read_buffer_[salt_size], payload_len});
+            callback({}, {&read_buffer_[key_size], payload_size});
         });
 }
 
@@ -323,17 +318,18 @@ void EncryptedDatagram::send_to(
     absl::Span<const uint8_t> chunk,
     const udp::endpoint &endpoint,
     CallbackT &&callback) {
-    const size_t salt_size = master_key_.method().salt_size;
-    RAND_bytes(&write_buffer_[0], salt_size);
+    size_t key_size = master_key_.method().key_size();
+    RAND_bytes(&write_buffer_[0], key_size);
     if (salt_filter_) {
-        salt_filter_->insert({&write_buffer_[0], salt_size});
+        salt_filter_->insert({&write_buffer_[0], key_size});
     }
     SessionKey write_key(master_key_, &write_buffer_[0]);
     write_key.encrypt(
-        chunk, &write_buffer_[salt_size],
-        &write_buffer_[salt_size + chunk.size()]);
+        chunk,
+        &write_buffer_[key_size],
+        &write_buffer_[key_size + chunk.size()]);
     socket_.async_send_to(
-        buffer(&write_buffer_[0], salt_size + chunk.size() + 16),
+        buffer(&write_buffer_[0], key_size + chunk.size() + 16),
         endpoint,
         [this, callback = std::forward<CallbackT>(callback)](
             std::error_code ec, size_t) mutable {

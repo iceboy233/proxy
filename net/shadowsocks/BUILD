@@ -8,6 +8,7 @@ cc_library(
         "@boringssl//:crypto",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
+        "@org_boost_boost//:container",
         "@org_boost_boost//:endian",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:asio",

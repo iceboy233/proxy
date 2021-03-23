@@ -20,28 +20,17 @@
 namespace net {
 namespace shadowsocks {
 
-struct EncryptionMethod {
-    const EVP_AEAD *aead;
-
-    static const EncryptionMethod &from_name(std::string_view name);
-
-    size_t key_size() const { return EVP_AEAD_key_length(aead); }
-    size_t nonce_size() const { return EVP_AEAD_nonce_length(aead); }
-};
-
 class MasterKey {
 public:
-    explicit MasterKey(const EncryptionMethod &method) : method_(method) {}
+    void init(std::string_view method, std::string_view password);
 
-    void init_with_password(std::string_view password);
-
+    const EVP_AEAD *aead() const { return aead_; }
     uint8_t *data() { return key_.data(); }
     const uint8_t *data() const { return key_.data(); }
-    size_t size() const { return method_.key_size(); }
-    const EncryptionMethod &method() const { return method_; }
+    size_t size() const { return EVP_AEAD_key_length(aead_); }
 
 private:
-    const EncryptionMethod &method_;
+    const EVP_AEAD *aead_;
     std::array<uint8_t, 32> key_;
 };
 
@@ -154,7 +143,7 @@ void EncryptedStream::write(
     absl::Span<const uint8_t> chunk, CallbackT &&callback) {
     size_t offset = 0;
     if (!write_key_) {
-        size_t key_size = master_key_.method().key_size();
+        size_t key_size = EVP_AEAD_key_length(master_key_.aead());
         RAND_bytes(&write_buffer_[0], key_size);
         if (salt_filter_) {
             salt_filter_->insert({&write_buffer_[0], key_size});
@@ -182,7 +171,7 @@ void EncryptedStream::write(
 template <typename CallbackT>
 void EncryptedStream::read_header(CallbackT &&callback) {
     buffered_read(
-        master_key_.method().key_size() + 18,
+        EVP_AEAD_key_length(master_key_.aead()) + 18,
         [this, callback = std::forward<CallbackT>(callback)](
             std::error_code ec, uint8_t *data) mutable {
             if (ec) {
@@ -190,7 +179,7 @@ void EncryptedStream::read_header(CallbackT &&callback) {
                 return;
             }
             read_key_.emplace(master_key_, data);
-            size_t key_size = master_key_.method().key_size();
+            size_t key_size = EVP_AEAD_key_length(master_key_.aead());
             if (!read_key_->decrypt(
                 {&data[key_size], 2}, &data[key_size + 2], &data[key_size])) {
                 callback(make_error_code(std::errc::result_out_of_range), {});
@@ -294,7 +283,7 @@ void EncryptedDatagram::receive_from(
                 callback(ec, {});
                 return;
             }
-            size_t key_size = master_key_.method().key_size();
+            size_t key_size = EVP_AEAD_key_length(master_key_.aead());
             size_t payload_size = size - key_size - 16;
             SessionKey read_key(master_key_, &read_buffer_[0]);
             if (!read_key.decrypt(
@@ -318,7 +307,7 @@ void EncryptedDatagram::send_to(
     absl::Span<const uint8_t> chunk,
     const udp::endpoint &endpoint,
     CallbackT &&callback) {
-    size_t key_size = master_key_.method().key_size();
+    size_t key_size = EVP_AEAD_key_length(master_key_.aead());
     RAND_bytes(&write_buffer_[0], key_size);
     if (salt_filter_) {
         salt_filter_->insert({&write_buffer_[0], key_size});

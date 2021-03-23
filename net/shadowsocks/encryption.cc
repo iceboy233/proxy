@@ -8,32 +8,29 @@
 #include <cstdlib>
 
 #include "base/logging.h"
+#include "boost/container/flat_map.hpp"
 
 namespace net {
 namespace shadowsocks {
 namespace {
 
-const std::array<std::pair<std::string_view, EncryptionMethod>, 5> methods = {{
-    {"aes-128-gcm", {EVP_aead_aes_128_gcm()}},
-    {"aes-192-gcm", {EVP_aead_aes_192_gcm()}},
-    {"aes-256-gcm", {EVP_aead_aes_256_gcm()}},
-    {"chacha20-ietf-poly1305", {EVP_aead_chacha20_poly1305()}},
-    {"xchacha20-ietf-poly1305", {EVP_aead_xchacha20_poly1305()}},
+const boost::container::flat_map<std::string_view, const EVP_AEAD *> aeads = {{
+    {"aes-128-gcm", EVP_aead_aes_128_gcm()},
+    {"aes-192-gcm", EVP_aead_aes_192_gcm()},
+    {"aes-256-gcm", EVP_aead_aes_256_gcm()},
+    {"chacha20-ietf-poly1305", EVP_aead_chacha20_poly1305()},
+    {"xchacha20-ietf-poly1305", EVP_aead_xchacha20_poly1305()},
 }};
 
 }  // namespace
 
-const EncryptionMethod &EncryptionMethod::from_name(std::string_view name) {
-    for (const auto &method : methods) {
-        if (method.first == name) {
-            return method.second;
-        }
+void MasterKey::init(std::string_view method, std::string_view password) {
+    auto iter = aeads.find(method);
+    if (iter == aeads.end()) {
+        LOG(fatal) << "invalid method: " << method;
+        abort();
     }
-    LOG(fatal) << "invalid method: " << name;
-    abort();
-}
-
-void MasterKey::init_with_password(std::string_view password) {
+    aead_ = iter->second;
     MD5_CTX ctx;
     MD5_Init(&ctx);
     MD5_Update(&ctx, password.data(), password.size());
@@ -46,19 +43,17 @@ void MasterKey::init_with_password(std::string_view password) {
     }
 }
 
-SessionKey::SessionKey(
-    const MasterKey &master_key, const uint8_t *salt) {
-    const EncryptionMethod &method = master_key.method();
+SessionKey::SessionKey(const MasterKey &master_key, const uint8_t *salt) {
     std::array<uint8_t, 32> key;
+    size_t key_size = EVP_AEAD_key_length(master_key.aead());
     if (!HKDF(
-        key.data(), method.key_size(), EVP_sha1(),
-        master_key.data(), master_key.size(), salt, method.key_size(),
-        reinterpret_cast<const uint8_t *>("ss-subkey"), 9)) {
+        key.data(), key_size, EVP_sha1(), master_key.data(), master_key.size(),
+        salt, key_size, reinterpret_cast<const uint8_t *>("ss-subkey"), 9)) {
         LOG(fatal) << "HKDF failed";
         abort();
     }
     if (!EVP_AEAD_CTX_init(
-        &aead_ctx_, method.aead, key.data(), method.key_size(), 16, nullptr)) {
+        &aead_ctx_, master_key.aead(), key.data(), key_size, 16, nullptr)) {
         LOG(fatal) << "EVP_AEAD_CTX_init failed";
         abort();
     }

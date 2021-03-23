@@ -31,8 +31,8 @@ int main(int argc, char *argv[]) {
 
     net::io_context io_context;
     auto executor = io_context.get_executor();
-    MasterKey master_key(EncryptionMethod::from_name(flags::method));
-    master_key.init_with_password(flags::password);
+    MasterKey master_key;
+    master_key.init(flags::method, flags::password);
     std::optional<SaltFilter> salt_filter;
     if (flags::detect_salt_reuse) {
         salt_filter.emplace();

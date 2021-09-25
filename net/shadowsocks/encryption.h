@@ -284,6 +284,10 @@ void EncryptedDatagram::receive_from(
                 return;
             }
             size_t key_size = EVP_AEAD_key_length(master_key_.aead());
+            if (size < key_size + 16) {
+                callback(make_error_code(std::errc::result_out_of_range), {});
+                return;
+            }
             size_t payload_size = size - key_size - 16;
             SessionKey read_key(master_key_, &read_buffer_[0]);
             if (!read_key.decrypt(

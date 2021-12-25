@@ -19,6 +19,12 @@ git_repository(
 )
 
 git_repository(
+    name = "com_github_google_flatbuffers",
+    commit = "6df40a2471737b27271bdd9b900ab5f3aec746c7",
+    remote = "https://github.com/google/flatbuffers.git",
+)
+
+git_repository(
     name = "com_google_googletest",
     commit = "dcc92d0ab6c4ce022162a23566d44f673251eee4",
     remote = "https://github.com/google/googletest.git",
@@ -35,6 +41,6 @@ boost_deps()
 
 git_repository(
     name = "org_iceboy_trunk",
-    commit = "498a7c5abcbbbe50a91fd31715df06849259adc1",
+    commit = "277be53b815c1624f48d51af50b1859284acb8aa",
     remote = "https://github.com/iceboy233/trunk.git",
 )

@@ -34,3 +34,15 @@ cc_binary(
         "@org_iceboy_trunk//net:asio-flags",
     ],
 )
+
+cc_binary(
+    name = "socks-server",
+    srcs = ["socks-server.cc"],
+    deps = [
+        "//net/socks:tcp-server",
+        "@org_iceboy_trunk//base:flags",
+        "@org_iceboy_trunk//base:logging",
+        "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:asio-flags",
+    ],
+)

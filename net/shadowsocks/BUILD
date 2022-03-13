@@ -6,7 +6,6 @@ cc_library(
     hdrs = ["encryption.h"],
     deps = [
         "@boringssl//:crypto",
-        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@org_boost_boost//:container",
         "@org_boost_boost//:endian",
@@ -62,6 +61,7 @@ cc_library(
         ":encryption",
         ":wire-structs",
         "@com_google_absl//absl/types:span",
+        "@com_google_absl//absl/strings",
         "@org_boost_boost//:endian",
         "@org_boost_boost//:smart_ptr",
         "@org_iceboy_trunk//base:logging",

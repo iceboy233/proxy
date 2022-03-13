@@ -6,7 +6,6 @@
 #include <string_view>
 #include <system_error>
 
-#include "absl/strings/str_cat.h"
 #include "base/logging.h"
 #include "boost/endian/conversion.hpp"
 #include "boost/smart_ptr/intrusive_ptr.hpp"

@@ -1,10 +1,13 @@
 build --enable_platform_specific_config
+
 build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a:-lm
 build:linux --action_env=BAZEL_LINKOPTS=-static-libgcc
 build:linux --cxxopt=-std=c++17
 build:linux --host_cxxopt=-std=c++17
+
 build:macos --cxxopt=-std=c++17
 build:macos --host_cxxopt=-std=c++17
+
 build:windows --copt=-DNOMINMAX
 build:windows --copt=-DWIN32_LEAN_AND_MEAN
 build:windows --copt=-utf-8
@@ -14,3 +17,13 @@ build:windows --host_copt=-DNOMINMAX
 build:windows --host_copt=-DWIN32_LEAN_AND_MEAN
 build:windows --host_copt=-utf-8
 build:windows --host_cxxopt=/std:c++17
+
+build:arm_crosstool --crosstool_top=@murtis_bazel_compilers//compilers/arm_compiler:toolchain
+build:arm_crosstool --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
+build:arm_crosstool --spawn_strategy=local
+
+build:armv7hf --config=arm_crosstool
+build:armv7hf --cpu=armeabi-v7a --compiler=gcc
+
+build:aarch64 --config=arm_crosstool
+build:aarch64 --cpu=aarch64-linux-gnu --compiler=gcc

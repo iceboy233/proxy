@@ -1,4 +1,5 @@
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_repository")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 git_repository(
     name = "boringssl",
@@ -44,3 +45,15 @@ git_repository(
     commit = "a8f2d2e7fac6ef405b28784fae1d3574febb0b39",
     remote = "https://github.com/iceboy233/trunk.git",
 )
+
+http_archive(
+    name = "murtis_bazel_compilers",
+    urls = [
+        "https://github.com/curtismuntz/bazel_compilers/archive/e7c3ee9820bfde7f7284bbc3a9540293741719cd.tar.gz",
+    ],
+    strip_prefix = "bazel_compilers-e7c3ee9820bfde7f7284bbc3a9540293741719cd",
+)
+
+load("@murtis_bazel_compilers//compilers:dependencies.bzl", "cross_compiler_dependencies")
+
+cross_compiler_dependencies()

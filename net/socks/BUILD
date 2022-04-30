@@ -12,6 +12,7 @@ cc_library(
         "@org_boost_boost//:smart_ptr",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:rate-limiter",
     ]
 )
 

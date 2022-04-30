@@ -1,7 +1,6 @@
 #include "net/shadowsocks/tcp-server.h"
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -40,8 +39,10 @@ private:
         absl::Span<const uint8_t> initial_chunk);
 
     void forward_write(absl::Span<const uint8_t> chunk);
+    void forward_rate_limit(size_t size);
     void backward_read();
     void backward_write();
+    void backward_rate_limit();
     void set_timer();
     void update_timer();
     void close();
@@ -63,10 +64,23 @@ TcpServer::TcpServer(
     const Options &options)
     : executor_(executor),
       master_key_(master_key),
-      options_(options),
+      salt_filter_(options.salt_filter),
+      connection_timeout_(options.connection_timeout),
       acceptor_(executor_, endpoint),
       resolver_(executor_),
-      timer_list_(executor_, options_.connection_timeout) {
+      timer_list_(executor_, connection_timeout_) {
+    if (options.forward_bytes_rate_limit) {
+        forward_bytes_rate_limiter_.emplace(
+            executor,
+            options.forward_bytes_rate_limit,
+            options.rate_limit_capacity);
+    }
+    if (options.backward_bytes_rate_limit) {
+        backward_bytes_rate_limiter_.emplace(
+            executor,
+            options.backward_bytes_rate_limit,
+            options.rate_limit_capacity);
+    }
     accept();
 }
 
@@ -80,8 +94,7 @@ TcpServer::Connection::Connection(TcpServer &server)
       socket_(server_.executor_),
       remote_socket_(server_.executor_),
       backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)),
-      encrypted_stream_(
-          socket_, server_.master_key_, server_.options_.salt_filter) {}
+      encrypted_stream_(socket_, server_.master_key_, server_.salt_filter_) {}
 
 void TcpServer::Connection::accept() {
     server_.acceptor_.async_accept(
@@ -228,13 +241,25 @@ void TcpServer::Connection::forward_write(absl::Span<const uint8_t> chunk) {
         remote_socket_,
         buffer(chunk.data(), chunk.size()),
         [connection = boost::intrusive_ptr<Connection>(this)](
-            std::error_code ec, size_t) {
+            std::error_code ec, size_t size) {
             if (ec) {
                 connection->close();
                 return;
             }
-            connection->forward_read_tail();
+            if (connection->server_.forward_bytes_rate_limiter_) {
+                connection->forward_rate_limit(size);
+            } else {
+                connection->forward_read_tail();
+            }
             connection->update_timer();
+        });
+}
+
+void TcpServer::Connection::forward_rate_limit(size_t size) {
+    server_.forward_bytes_rate_limiter_->acquire(
+        size,
+        [connection = boost::intrusive_ptr<Connection>(this)]() {
+            connection->forward_read_tail();
         });
 }
 
@@ -262,14 +287,25 @@ void TcpServer::Connection::backward_write() {
                 connection->close();
                 return;
             }
-            connection->backward_read();
+            if (connection->server_.forward_bytes_rate_limiter_) {
+                connection->backward_rate_limit();
+            } else {
+                connection->backward_read();
+            }
             connection->update_timer();
         });
 }
 
+void TcpServer::Connection::backward_rate_limit() {
+    server_.backward_bytes_rate_limiter_->acquire(
+        backward_read_size_,
+        [connection = boost::intrusive_ptr<Connection>(this)]() {
+            connection->backward_read();
+        });
+}
+
 void TcpServer::Connection::set_timer() {
-    if (server_.options_.connection_timeout ==
-        std::chrono::nanoseconds::zero()) {
+    if (server_.connection_timeout_ == std::chrono::nanoseconds::zero()) {
         return;
     }
     timer_.emplace(

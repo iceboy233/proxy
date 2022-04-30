@@ -9,6 +9,7 @@
 #include "absl/types/span.h"
 #include "net/asio.h"
 #include "net/asio-hash.h"
+#include "net/rate-limiter.h"
 #include "net/shadowsocks/encryption.h"
 #include "net/timer-list.h"
 
@@ -23,6 +24,10 @@ public:
         SaltFilter *salt_filter = nullptr;
         std::chrono::nanoseconds connection_timeout =
             std::chrono::nanoseconds::zero();
+        uint64_t forward_packets_rate_limit = 0;
+        uint64_t backward_packets_rate_limit = 0;
+        std::chrono::nanoseconds rate_limit_capacity =
+            std::chrono::milliseconds(125);
     };
 
     UdpServer(
@@ -41,13 +46,16 @@ private:
         const udp::endpoint &server_endpoint);
 
     any_io_executor executor_;
-    Options options_;
+    SaltFilter *salt_filter_;
+    std::chrono::nanoseconds connection_timeout_;
     udp::socket socket_;
     EncryptedDatagram encrypted_datagram_;
     TimerList timer_list_;
     absl::flat_hash_map<std::tuple<udp::endpoint, bool>, Connection *>
         connections_;
     udp::endpoint receive_endpoint_;
+    std::optional<RateLimiter> forward_packets_rate_limiter_;
+    std::optional<RateLimiter> backward_packets_rate_limiter_;
 };
 
 }  // namespace shadowsocks

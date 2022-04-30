@@ -66,6 +66,7 @@ cc_library(
         "@org_boost_boost//:smart_ptr",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:rate-limiter",
         "@org_iceboy_trunk//net:timer-list",
     ],
 )
@@ -84,6 +85,7 @@ cc_library(
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:asio",
         "@org_iceboy_trunk//net:asio-hash",
+        "@org_iceboy_trunk//net:rate-limiter",
         "@org_iceboy_trunk//net:timer-list",
     ],
 )

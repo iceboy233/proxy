@@ -52,10 +52,23 @@ UdpServer::UdpServer(
     const MasterKey &master_key,
     const Options &options)
     : executor_(executor),
-      options_(options),
+      salt_filter_(options.salt_filter),
+      connection_timeout_(options.connection_timeout),
       socket_(executor, endpoint),
-      encrypted_datagram_(socket_, master_key, options_.salt_filter),
-      timer_list_(executor_, options_.connection_timeout) {
+      encrypted_datagram_(socket_, master_key, salt_filter_),
+      timer_list_(executor_, connection_timeout_) {
+    if (options.forward_packets_rate_limit) {
+        forward_packets_rate_limiter_.emplace(
+            executor,
+            options.forward_packets_rate_limit,
+            options.rate_limit_capacity);
+    }
+    if (options.backward_packets_rate_limit) {
+        backward_packets_rate_limiter_.emplace(
+            executor,
+            options.backward_packets_rate_limit,
+            options.rate_limit_capacity);
+    }
     forward_receive();
 }
 
@@ -112,6 +125,11 @@ void UdpServer::forward_parse(absl::Span<const uint8_t> chunk) {
 void UdpServer::forward_dispatch(
     absl::Span<const uint8_t> chunk,
     const udp::endpoint &server_endpoint) {
+    if (forward_packets_rate_limiter_ &&
+        !forward_packets_rate_limiter_->acquire_nowait(1)) {
+        forward_receive();
+        return;
+    }
     auto iter = connections_.find(
         {receive_endpoint_, server_endpoint.address().is_v6()});
     if (iter != connections_.end()) {
@@ -173,6 +191,11 @@ void UdpServer::Connection::backward_receive() {
 }
 
 void UdpServer::Connection::backward_send() {
+    if (server_.backward_packets_rate_limiter_ &&
+        !server_.backward_packets_rate_limiter_->acquire_nowait(1)) {
+        backward_receive();
+        return;
+    }
     wire::AddressHeader *header;
     size_t size;
     if (backward_receive_endpoint_.address().is_v4()) {
@@ -208,8 +231,7 @@ void UdpServer::Connection::backward_send() {
 }
 
 void UdpServer::Connection::set_timer() {
-    if (server_.options_.connection_timeout ==
-        std::chrono::nanoseconds::zero()) {
+    if (server_.connection_timeout_ == std::chrono::nanoseconds::zero()) {
         return;
     }
     timer_.emplace(

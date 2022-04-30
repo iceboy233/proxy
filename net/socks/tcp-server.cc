@@ -36,8 +36,10 @@ private:
     void reply();
     void forward_read();
     void forward_write();
+    void forward_rate_limit();
     void backward_read();
     void backward_write();
+    void backward_rate_limit();
 
     void close();
 
@@ -59,6 +61,18 @@ TcpServer::TcpServer(
     : executor_(executor),
       acceptor_(executor_, endpoint),
       resolver_(executor_) {
+    if (options.forward_bytes_rate_limit) {
+        forward_bytes_rate_limiter_.emplace(
+            executor,
+            options.forward_bytes_rate_limit,
+            options.rate_limit_capacity);
+    }
+    if (options.backward_bytes_rate_limit) {
+        backward_bytes_rate_limiter_.emplace(
+            executor,
+            options.backward_bytes_rate_limit,
+            options.rate_limit_capacity);
+    }
     accept();
 }
 
@@ -303,6 +317,18 @@ void TcpServer::Connection::forward_write() {
                 connection->close();
                 return;
             }
+            if (connection->server_.forward_bytes_rate_limiter_) {
+                connection->forward_rate_limit();
+            } else {
+                connection->forward_read();
+            }
+        });
+}
+
+void TcpServer::Connection::forward_rate_limit() {
+    server_.forward_bytes_rate_limiter_->acquire(
+        forward_read_size_,
+        [connection = boost::intrusive_ptr<Connection>(this)]() {
             connection->forward_read();
         });
 }
@@ -332,8 +358,19 @@ void TcpServer::Connection::backward_write() {
                 connection->close();
                 return;
             }
+            if (connection->server_.backward_bytes_rate_limiter_) {
+                connection->backward_rate_limit();
+            } else {
+                connection->backward_read();
+            }
+        });
+}
+
+void TcpServer::Connection::backward_rate_limit() {
+    server_.backward_bytes_rate_limiter_->acquire(
+        backward_read_size_,
+        [connection = boost::intrusive_ptr<Connection>(this)]() {
             connection->backward_read();
-            // TODO(iceboy): update keep alive timer
         });
 }
 

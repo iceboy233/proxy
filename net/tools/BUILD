@@ -11,6 +11,22 @@ cc_binary(
 )
 
 cc_binary(
+    name = "rpc-relay",
+    srcs = ["rpc-relay.cc"],
+    deps = [
+        "//net:endpoint",
+        "@com_google_absl//absl/strings",
+        "@org_iceboy_trunk//base:flags",
+        "@org_iceboy_trunk//base:logging",
+        "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:asio-flags",
+        "@org_iceboy_trunk//net/rpc:client",
+        "@org_iceboy_trunk//net/rpc:server",
+        "@org_iceboy_trunk//security:key",
+    ],
+)
+
+cc_binary(
     name = "rpc-server",
     srcs = ["rpc-server.cc"],
     deps = [

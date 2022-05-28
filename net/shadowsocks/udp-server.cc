@@ -234,11 +234,7 @@ void UdpServer::Connection::set_timer() {
     if (server_.connection_timeout_ == std::chrono::nanoseconds::zero()) {
         return;
     }
-    timer_.emplace(
-        server_.timer_list_,
-        [connection = boost::intrusive_ptr<Connection>(this)]() {
-            connection->close();
-        });
+    timer_.emplace(server_.timer_list_, [this]() { close(); });
 }
 
 void UdpServer::Connection::update_timer() {

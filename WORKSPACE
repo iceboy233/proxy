@@ -33,7 +33,7 @@ git_repository(
 
 git_repository(
     name = "org_boost_boost",
-    commit = "6ea089e46ba74a7639ba6180a74f63d4d8dfff98",
+    commit = "60a48497f5f9453049e8a35b8f0c799d2673e9e5",
     remote = "https://github.com/iceboy233/boost.git",
 )
 

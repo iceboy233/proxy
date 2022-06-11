@@ -23,6 +23,24 @@ cc_binary(
 )
 
 cc_binary(
+    name = "rpc-client",
+    srcs = ["rpc-client.cc"],
+    deps = [
+        "//net:endpoint",
+        "@com_github_google_flatbuffers//:flatbuffers",
+        "@com_google_absl//absl/strings",
+        "@org_iceboy_trunk//base:flags",
+        "@org_iceboy_trunk//base:logging",
+        "@org_iceboy_trunk//io:file-utils",
+        "@org_iceboy_trunk//io/posix:file",
+        "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:blocking-result",
+        "@org_iceboy_trunk//net/rpc:client",
+        "@org_iceboy_trunk//util:flatbuffers-reflection",
+    ],
+)
+
+cc_binary(
     name = "rpc-relay",
     srcs = ["rpc-relay.cc"],
     deps = [

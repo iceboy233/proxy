@@ -10,7 +10,6 @@
 #include "base/flags.h"
 #include "base/logging.h"
 #include "net/asio.h"
-#include "net/asio-flags.h"
 #include "net/endpoint.h"
 #include "net/rpc/client.h"
 #include "net/rpc/server.h"
@@ -18,9 +17,9 @@
 
 DEFINE_FLAG(net::Endpoint, endpoint,
             net::Endpoint(net::address_v4::loopback(), 1024), "");
-DEFINE_FLAG(std::vector<std::string>, keys, {}, "");
 DEFINE_FLAG(std::vector<std::string>, methods, {},
             "Comma-separated list of method:ip:port.");
+DEFINE_FLAG(std::vector<std::string>, keys, {}, "");
 
 namespace net {
 namespace {
@@ -81,7 +80,7 @@ int main(int argc, char *argv[]) {
 
     io_context io_context;
     auto executor = io_context.get_executor();
-    rpc::Server server(executor, flags::endpoint.udp_endpoint(), {});
+    rpc::Server server(executor, flags::endpoint, {});
     rpc::Client client(executor, {});
 
     for (const std::string &key_string : flags::keys) {

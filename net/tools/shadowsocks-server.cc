@@ -5,13 +5,13 @@
 #include "base/flags.h"
 #include "base/logging.h"
 #include "net/asio.h"
-#include "net/asio-flags.h"
+#include "net/endpoint.h"
 #include "net/shadowsocks/encryption.h"
 #include "net/shadowsocks/tcp-server.h"
 #include "net/shadowsocks/udp-server.h"
 
-DEFINE_FLAG(net::address, ip, net::address_v4::loopback(), "");
-DEFINE_FLAG(uint16_t, port, 8388, "");
+DEFINE_FLAG(net::Endpoint, endpoint,
+            net::Endpoint(net::address_v4::loopback(), 8388), "");
 DEFINE_FLAG(bool, enable_tcp, true, "");
 DEFINE_FLAG(bool, enable_udp, true, "");
 DEFINE_FLAG(std::string, password, "", "");
@@ -44,11 +44,7 @@ void create_tcp_server(
         flags::tcp_connection_timeout_secs);
     options.forward_bytes_rate_limit = flags::tcp_forward_bytes_rate_limit;
     options.backward_bytes_rate_limit = flags::tcp_backward_bytes_rate_limit;
-    tcp_server.emplace(
-        executor,
-        net::tcp::endpoint(flags::ip, flags::port),
-        master_key,
-        options);
+    tcp_server.emplace(executor, flags::endpoint, master_key, options);
 }
 
 void create_udp_server(
@@ -65,12 +61,7 @@ void create_udp_server(
     options.forward_packets_rate_limit = flags::udp_forward_packets_rate_limit;
     options.backward_packets_rate_limit =
         flags::udp_backward_packets_rate_limit;
-    udp_server.emplace(
-        executor,
-        net::udp::endpoint(flags::ip, flags::port),
-        master_key,
-        options);
-
+    udp_server.emplace(executor, flags::endpoint, master_key, options);
 }
 
 }  // namespace

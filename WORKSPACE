@@ -42,7 +42,7 @@ boost_deps()
 
 git_repository(
     name = "org_iceboy_trunk",
-    commit = "af3b59f1a7486fd178731236c98f87b0566ff9ae",
+    commit = "84ed881a8ed32c96dc8b91356d4894f44d9777a0",
     remote = "https://github.com/iceboy233/trunk.git",
 )
 

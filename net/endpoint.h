@@ -27,8 +27,8 @@ public:
     uint16_t port() const { return port_; }
     void set_port(uint16_t port) { port_ = port; }
 
-    tcp::endpoint tcp_endpoint() const { return {address_, port_}; }
-    udp::endpoint udp_endpoint() const { return {address_, port_}; }
+    operator tcp::endpoint() const { return {address_, port_}; }
+    operator udp::endpoint() const { return {address_, port_}; }
 
     static std::optional<EndpointBase<AddressT>> from_string(
         std::string_view string);

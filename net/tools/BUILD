@@ -1,4 +1,16 @@
 cc_binary(
+    name = "http-server",
+    srcs = ["http-server.cc"],
+    deps = [
+        "//net:endpoint",
+        "@org_iceboy_trunk//base:flags",
+        "@org_iceboy_trunk//base:logging",
+        "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net/http:server",
+    ],
+)
+
+cc_binary(
     name = "rpc-benchmark",
     srcs = ["rpc-benchmark.cc"],
     deps = [

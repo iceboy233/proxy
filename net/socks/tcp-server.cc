@@ -224,8 +224,14 @@ void TcpServer::Connection::connect() {
             {reinterpret_cast<const char *>(&forward_buffer_[5]), host_length},
             boost::endian::load_big_u16(&forward_buffer_[host_length + 5]));
         break;
+    case wire::AddressType::ipv6:
+        connect(
+            std::array<tcp::endpoint, 1>{{
+                tcp::endpoint(
+                    address_v6(header->ipv6_address),
+                    boost::endian::load_big_u16(&forward_buffer_[20]))}});
+        break;
     default:
-        // TODO(iceboy): support other address types
         LOG(error) << "unsupported address type "
                    << static_cast<int>(header->atyp);
         close();
@@ -272,15 +278,23 @@ void TcpServer::Connection::reply() {
     header->ver = 5;
     header->rep = wire::Reply::succeeded;
     header->rsv = 0;
-    // TODO(iceboy): support other address types
-    header->atyp = wire::AddressType::ipv4;
-    header->ipv4_address =
-        remote_socket_.local_endpoint().address().to_v4().to_bytes();
-    boost::endian::store_big_u16(
-        &backward_buffer_[8], remote_socket_.local_endpoint().port());
+    auto endpoint = remote_socket_.local_endpoint();
+    auto address = endpoint.address();
+    size_t header_size;
+    if (address.is_v4()) {
+        header->atyp = wire::AddressType::ipv4;
+        header->ipv4_address = address.to_v4().to_bytes();
+        boost::endian::store_big_u16(&backward_buffer_[8], endpoint.port());
+        header_size = 10;
+    } else {
+        header->atyp = wire::AddressType::ipv6;
+        header->ipv6_address = address.to_v6().to_bytes();
+        boost::endian::store_big_u16(&backward_buffer_[20], endpoint.port());
+        header_size = 22;
+    }
     async_write(
         socket_,
-        buffer(backward_buffer_.get(), 10),
+        buffer(backward_buffer_.get(), header_size),
         [connection = boost::intrusive_ptr<Connection>(this)](
             std::error_code ec, size_t) {
             if (ec) {

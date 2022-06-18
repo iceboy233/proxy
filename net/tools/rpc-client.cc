@@ -90,8 +90,7 @@ int main(int argc, char *argv[]) {
                    << std::get<0>(result.args());
         return 1;
     }
-    size_t size;
-    ec = io::posix::stdout.write(response_json, size);
+    ec = write(io::posix::stdout, response_json);
     if (ec) {
         LOG(fatal) << "write failed: " << ec;
         return 1;

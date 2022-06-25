@@ -11,6 +11,21 @@ cc_binary(
 )
 
 cc_binary(
+    name = "icmp-scanner",
+    srcs = ["icmp-scanner.cc"],
+    deps = [
+        "@org_iceboy_trunk//base:flags",
+        "@org_iceboy_trunk//base:logging",
+        "@org_iceboy_trunk//io:stream",
+        "@org_iceboy_trunk//io/posix:file",
+        "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:asio-flags",
+        "@org_iceboy_trunk//net:blocking-result",
+        "@org_iceboy_trunk//net:icmp-client",
+    ],
+)
+
+cc_binary(
     name = "rpc-benchmark",
     srcs = ["rpc-benchmark.cc"],
     deps = [

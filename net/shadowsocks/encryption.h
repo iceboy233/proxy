@@ -15,6 +15,7 @@
 
 #include "absl/types/span.h"
 #include "net/asio.h"
+#include "net/stream/reader.h"
 #include "util/hash-filter.h"
 
 namespace net {
@@ -87,16 +88,10 @@ private:
     template <typename CallbackT>
     void read_payload(size_t length, CallbackT &&callback);
 
-    template <typename CallbackT>
-    void buffered_read(size_t size, CallbackT &&callback);
-
     tcp::socket &socket_;
     const MasterKey &master_key_;
     SaltFilter *salt_filter_;
-    std::unique_ptr<uint8_t[]> read_buffer_;
-    static constexpr size_t read_buffer_size_ = 16384 + 34;
-    size_t read_buffer_start_ = 0;
-    size_t read_buffer_end_ = 0;
+    stream::Reader reader_;
     std::unique_ptr<uint8_t[]> write_buffer_;
     static constexpr size_t write_buffer_size_ = 16384 + 66;
     std::optional<SessionKey> read_key_;
@@ -170,16 +165,18 @@ void EncryptedStream::write(
 
 template <typename CallbackT>
 void EncryptedStream::read_header(CallbackT &&callback) {
-    buffered_read(
+    reader_.read(
+        socket_,
         EVP_AEAD_key_length(master_key_.aead()) + 18,
         [this, callback = std::forward<CallbackT>(callback)](
-            std::error_code ec, uint8_t *data) mutable {
+            std::error_code ec) mutable {
             if (ec) {
                 callback(ec, {});
                 return;
             }
-            read_key_.emplace(master_key_, data);
             size_t key_size = EVP_AEAD_key_length(master_key_.aead());
+            uint8_t *data = reader_.consume(key_size + 18);
+            read_key_.emplace(master_key_, data);
             if (!read_key_->decrypt(
                 {&data[key_size], 2}, &data[key_size + 2], &data[key_size])) {
                 callback(make_error_code(std::errc::result_out_of_range), {});
@@ -201,14 +198,16 @@ void EncryptedStream::read_header(CallbackT &&callback) {
 
 template <typename CallbackT>
 void EncryptedStream::read_length(CallbackT &&callback) {
-    buffered_read(
+    reader_.read(
+        socket_,
         18,
         [this, callback = std::forward<CallbackT>(callback)](
-            std::error_code ec, uint8_t *data) mutable {
+            std::error_code ec) mutable {
             if (ec) {
                 callback(ec, {});
                 return;
             }
+            uint8_t *data = reader_.consume(18);
             if (!read_key_->decrypt({data, 2}, &data[2], data)) {
                 callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
@@ -224,50 +223,21 @@ void EncryptedStream::read_length(CallbackT &&callback) {
 
 template <typename CallbackT>
 void EncryptedStream::read_payload(size_t length, CallbackT &&callback) {
-    buffered_read(
+    reader_.read(
+        socket_,
         length + 16,
         [this, length, callback = std::forward<CallbackT>(callback)](
-            std::error_code ec, uint8_t *data) mutable {
+            std::error_code ec) mutable {
             if (ec) {
                 callback(ec, {});
                 return;
             }
+            uint8_t *data = reader_.consume(length + 16);
             if (!read_key_->decrypt({data, length}, &data[length], data)) {
                 callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
             callback({}, {data, length});
-        });
-}
-
-template <typename CallbackT>
-void EncryptedStream::buffered_read(size_t size, CallbackT &&callback) {
-    size_t remaining_size = read_buffer_end_ - read_buffer_start_;
-    if (remaining_size >= size) {
-        uint8_t *data = &read_buffer_[read_buffer_start_];
-        read_buffer_start_ += size;
-        callback({}, data);
-        return;
-    }
-    if (read_buffer_start_) {
-        memmove(
-            &read_buffer_[0],
-            &read_buffer_[read_buffer_start_],
-            remaining_size);
-        read_buffer_start_ = 0;
-        read_buffer_end_ = remaining_size;
-    }
-    async_read(
-        socket_,
-        buffer(
-            &read_buffer_[read_buffer_end_],
-            read_buffer_size_ - read_buffer_end_),
-        transfer_at_least(size - remaining_size),
-        [this, size, callback = std::forward<CallbackT>(callback)](
-            std::error_code ec, size_t transferred_size) mutable {
-            read_buffer_start_ += size;
-            read_buffer_end_ += transferred_size;
-            callback(ec, &read_buffer_[0]);
         });
 }
 

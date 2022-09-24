@@ -5,6 +5,7 @@ cc_library(
     srcs = ["encryption.cc"],
     hdrs = ["encryption.h"],
     deps = [
+        "//net/stream:reader",
         "@boringssl//:crypto",
         "@com_google_absl//absl/types:span",
         "@org_boost_boost//:container",

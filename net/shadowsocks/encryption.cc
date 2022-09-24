@@ -123,7 +123,7 @@ EncryptedStream::EncryptedStream(
     : socket_(socket),
       master_key_(master_key),
       salt_filter_(salt_filter),
-      read_buffer_(std::make_unique<uint8_t[]>(read_buffer_size_)),
+      reader_(16384 + 34),
       write_buffer_(std::make_unique<uint8_t[]>(write_buffer_size_)) {}
 
 EncryptedDatagram::EncryptedDatagram(

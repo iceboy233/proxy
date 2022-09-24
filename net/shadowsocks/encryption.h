@@ -88,6 +88,9 @@ private:
     template <typename CallbackT>
     void read_payload(size_t length, CallbackT &&callback);
 
+    template <typename CallbackT>
+    void read_discard(CallbackT &&callback);
+
     tcp::socket &socket_;
     const MasterKey &master_key_;
     SaltFilter *salt_filter_;
@@ -179,17 +182,17 @@ void EncryptedStream::read_header(CallbackT &&callback) {
             read_key_.emplace(master_key_, data);
             if (!read_key_->decrypt(
                 {&data[key_size], 2}, &data[key_size + 2], &data[key_size])) {
-                callback(make_error_code(std::errc::result_out_of_range), {});
+                read_discard(std::forward<CallbackT>(callback));
                 return;
             }
             if (salt_filter_ &&
                 !salt_filter_->test_and_insert({data, key_size})) {
-                callback(make_error_code(std::errc::result_out_of_range), {});
+                read_discard(std::forward<CallbackT>(callback));
                 return;
             }
             size_t length = boost::endian::load_big_u16(&data[key_size]);
             if (length >= 16384) {
-                callback(make_error_code(std::errc::result_out_of_range), {});
+                read_discard(std::forward<CallbackT>(callback));
                 return;
             }
             read_payload(length, std::forward<CallbackT>(callback));
@@ -209,12 +212,12 @@ void EncryptedStream::read_length(CallbackT &&callback) {
             }
             uint8_t *data = reader_.consume(18);
             if (!read_key_->decrypt({data, 2}, &data[2], data)) {
-                callback(make_error_code(std::errc::result_out_of_range), {});
+                read_discard(std::forward<CallbackT>(callback));
                 return;
             }
             size_t length = boost::endian::load_big_u16(data);
             if (length >= 16384) {
-                callback(make_error_code(std::errc::result_out_of_range), {});
+                read_discard(std::forward<CallbackT>(callback));
                 return;
             }
             read_payload(length, std::forward<CallbackT>(callback));
@@ -234,10 +237,26 @@ void EncryptedStream::read_payload(size_t length, CallbackT &&callback) {
             }
             uint8_t *data = reader_.consume(length + 16);
             if (!read_key_->decrypt({data, length}, &data[length], data)) {
-                callback(make_error_code(std::errc::result_out_of_range), {});
+                read_discard(std::forward<CallbackT>(callback));
                 return;
             }
             callback({}, {data, length});
+        });
+}
+
+template <typename CallbackT>
+void EncryptedStream::read_discard(CallbackT &&callback) {
+    reader_.read(
+        socket_,
+        1,
+        [this, callback = std::forward<CallbackT>(callback)](
+            std::error_code ec) mutable {
+            if (ec) {
+                callback(ec, {});
+                return;
+            }
+            reader_.consume(reader_.size());
+            read_discard(std::forward<CallbackT>(callback));
         });
 }
 

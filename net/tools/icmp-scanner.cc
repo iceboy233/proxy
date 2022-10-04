@@ -7,10 +7,11 @@
 #include "net/blocking-result.h"
 #include "net/icmp-client.h"
 
-DEFINE_FLAG(net::address, ip_from, {}, "");
-DEFINE_FLAG(net::address, ip_to, {}, "");
+DEFINE_FLAG(net::address, from, {}, "");
+DEFINE_FLAG(net::address, to, {}, "");
+DEFINE_FLAG(int32_t, limit, 256, "");
 DEFINE_FLAG(int32_t, rps, 1000, "");
-DEFINE_FLAG(size_t, request_size, 0, "");
+DEFINE_FLAG(size_t, size, 0, "");
 
 namespace net {
 namespace {
@@ -29,7 +30,7 @@ void request(
     ++pending_requests;
     icmp_client.request(
         endpoint,
-        std::vector<uint8_t>(flags::request_size),
+        std::vector<uint8_t>(flags::size),
         [address = endpoint.address(), start_time, &os, &pending_requests](
             std::error_code ec, ConstBufferSpan) {
             if (ec) {
@@ -69,18 +70,18 @@ int main(int argc, char *argv[]) {
     steady_timer timer(executor);
     io::OStream os(io::posix::stdout);
     int64_t pending_requests = 0;
-    if (flags::ip_from.is_v4()) {
-        address_v4_iterator first(flags::ip_from.to_v4());
-        address_v4_iterator last(flags::ip_to.to_v4());
-        for (; first != last; ++first) {
+    if (flags::from.is_v4()) {
+        address_v4_iterator first(flags::from.to_v4());
+        address_v4_iterator last(flags::to.to_v4());
+        for (; first != last && flags::limit; ++first, --flags::limit) {
             request(
                 io_context, icmp_client, timer, {*first, 0}, os,
                 pending_requests);
         }
     } else {
-        address_v6_iterator first(flags::ip_from.to_v6());
-        address_v6_iterator last(flags::ip_to.to_v6());
-        for (; first != last; ++first) {
+        address_v6_iterator first(flags::from.to_v6());
+        address_v6_iterator last(flags::to.to_v6());
+        for (; first != last && flags::limit; ++first, --flags::limit) {
             request(
                 io_context, icmp_client, timer, {*first, 0}, os,
                 pending_requests);

@@ -6,6 +6,7 @@
 #include <optional>
 
 #include "net/asio.h"
+#include "net/proxy/connector.h"
 #include "net/rate-limiter.h"
 
 namespace net {
@@ -23,6 +24,7 @@ public:
     TcpServer(
         const any_io_executor &executor,
         const tcp::endpoint &endpoint,
+        Connector &connector,
         const Options &options);
 
     void accept();
@@ -32,7 +34,7 @@ private:
 
     any_io_executor executor_;
     tcp::acceptor acceptor_;
-    tcp::resolver resolver_;
+    Connector &connector_;
     std::optional<RateLimiter> forward_bytes_rate_limiter_;
     std::optional<RateLimiter> backward_bytes_rate_limiter_;
 };

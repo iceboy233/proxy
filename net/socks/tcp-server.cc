@@ -9,6 +9,7 @@
 #include "boost/endian/conversion.hpp"
 #include "boost/smart_ptr/intrusive_ptr.hpp"
 #include "boost/smart_ptr/intrusive_ref_counter.hpp"
+#include "net/proxy/stream.h"
 #include "net/socks/wire-structs.h"
 
 namespace net {
@@ -27,11 +28,7 @@ private:
     void handshake_reply();
     void request();
     void dispatch();
-    void resolve(std::string_view host, uint16_t port);
     void connect();
-
-    template <typename EndpointsT>
-    void connect(const EndpointsT &endpoints);
 
     void reply();
     void forward_read();
@@ -45,7 +42,7 @@ private:
 
     TcpServer &server_;
     tcp::socket socket_;
-    tcp::socket remote_socket_;
+    std::unique_ptr<Stream> remote_stream_;
     std::unique_ptr<uint8_t[]> forward_buffer_;
     static constexpr size_t forward_buffer_size_ = 16384;
     size_t forward_read_size_;
@@ -57,10 +54,11 @@ private:
 TcpServer::TcpServer(
     const any_io_executor &executor,
     const tcp::endpoint &endpoint,
+    Connector &connector,
     const Options &options)
     : executor_(executor),
       acceptor_(executor_, endpoint),
-      resolver_(executor_) {
+      connector_(connector) {
     if (options.forward_bytes_rate_limit) {
         forward_bytes_rate_limiter_.emplace(
             executor,
@@ -84,7 +82,6 @@ void TcpServer::accept() {
 TcpServer::Connection::Connection(TcpServer &server)
     : server_(server),
       socket_(server_.executor_),
-      remote_socket_(server_.executor_),
       forward_buffer_(std::make_unique<uint8_t[]>(forward_buffer_size_)),
       backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)) {}
 
@@ -209,27 +206,42 @@ void TcpServer::Connection::dispatch() {
 void TcpServer::Connection::connect() {
     const auto *header =
         reinterpret_cast<wire::RequestHeader *>(forward_buffer_.get());
-    size_t host_length;
+    auto callback = [connection = boost::intrusive_ptr<Connection>(this)](
+        std::error_code ec, std::unique_ptr<Stream> stream) {
+        if (ec) {
+            connection->close();
+            return;
+        }
+        connection->remote_stream_ = std::move(stream);
+        connection->reply();
+        connection->forward_read();
+        // TODO(iceboy): update keep alive timer
+    };
+    // TODO(iceboy): send initial data during connect.
     switch (header->atyp) {
     case wire::AddressType::ipv4:
-        connect(
-            std::array<tcp::endpoint, 1>{{
-                tcp::endpoint(
-                    address_v4(header->ipv4_address),
-                    boost::endian::load_big_u16(&forward_buffer_[8]))}});
+        server_.connector_.connect_tcp(
+            address_v4(header->ipv4_address),
+            boost::endian::load_big_u16(&forward_buffer_[8]),
+            const_buffer(),
+            std::move(callback));
         break;
     case wire::AddressType::host:
-        host_length = header->host_length;
-        resolve(
-            {reinterpret_cast<const char *>(&forward_buffer_[5]), host_length},
-            boost::endian::load_big_u16(&forward_buffer_[host_length + 5]));
+        server_.connector_.connect_tcp(
+            std::string_view(
+                reinterpret_cast<const char *>(&forward_buffer_[5]),
+                header->host_length),
+            boost::endian::load_big_u16(
+                &forward_buffer_[header->host_length + 5]),
+            const_buffer(),
+            std::move(callback));
         break;
     case wire::AddressType::ipv6:
-        connect(
-            std::array<tcp::endpoint, 1>{{
-                tcp::endpoint(
-                    address_v6(header->ipv6_address),
-                    boost::endian::load_big_u16(&forward_buffer_[20]))}});
+        server_.connector_.connect_tcp(
+            address_v6(header->ipv6_address),
+            boost::endian::load_big_u16(&forward_buffer_[20]),
+            const_buffer(),
+            std::move(callback));
         break;
     default:
         LOG(error) << "unsupported address type "
@@ -239,62 +251,17 @@ void TcpServer::Connection::connect() {
     }
 }
 
-void TcpServer::Connection::resolve(std::string_view host, uint16_t port) {
-    server_.resolver_.async_resolve(
-        host,
-        absl::StrCat(port),
-        [connection = boost::intrusive_ptr<Connection>(this)](
-            std::error_code ec, const tcp::resolver::results_type &endpoints) {
-            if (ec) {
-                connection->close();
-                return;
-            }
-            connection->connect(endpoints);
-            // TODO(iceboy): update keep alive timer
-        });
-}
-
-template <typename EndpointsT>
-void TcpServer::Connection::connect(const EndpointsT &endpoints) {
-    async_connect(
-        remote_socket_,
-        endpoints,
-        [connection = boost::intrusive_ptr<Connection>(this)](
-            std::error_code ec, const tcp::endpoint &) {
-            if (ec) {
-                connection->close();
-                return;
-            }
-            connection->remote_socket_.set_option(tcp::no_delay(true));
-            connection->reply();
-            connection->forward_read();
-            // TODO(iceboy): update keep alive timer
-        });
-}
-
 void TcpServer::Connection::reply() {
     auto *header =
         reinterpret_cast<wire::ReplyHeader *>(backward_buffer_.get());
     header->ver = 5;
     header->rep = wire::Reply::succeeded;
     header->rsv = 0;
-    auto endpoint = remote_socket_.local_endpoint();
-    auto address = endpoint.address();
-    size_t header_size;
-    if (address.is_v4()) {
-        header->atyp = wire::AddressType::ipv4;
-        header->ipv4_address = address.to_v4().to_bytes();
-        boost::endian::store_big_u16(&backward_buffer_[8], endpoint.port());
-        header_size = 10;
-    } else {
-        header->atyp = wire::AddressType::ipv6;
-        header->ipv6_address = address.to_v6().to_bytes();
-        boost::endian::store_big_u16(&backward_buffer_[20], endpoint.port());
-        header_size = 22;
-    }
+    header->atyp = wire::AddressType::ipv4;
+    memset(&backward_buffer_[4], 0, 6);
     async_write(
         socket_,
-        buffer(backward_buffer_.get(), header_size),
+        buffer(backward_buffer_.get(), 10),
         [connection = boost::intrusive_ptr<Connection>(this)](
             std::error_code ec, size_t) {
             if (ec) {
@@ -323,7 +290,7 @@ void TcpServer::Connection::forward_read() {
 
 void TcpServer::Connection::forward_write() {
     async_write(
-        remote_socket_,
+        *remote_stream_,
         buffer(forward_buffer_.get(), forward_read_size_),
         [connection = boost::intrusive_ptr<Connection>(this)](
             std::error_code ec, size_t) {
@@ -348,7 +315,7 @@ void TcpServer::Connection::forward_rate_limit() {
 }
 
 void TcpServer::Connection::backward_read() {
-    remote_socket_.async_read_some(
+    remote_stream_->async_read_some(
         buffer(backward_buffer_.get(), backward_buffer_size_),
         [connection = boost::intrusive_ptr<Connection>(this)](
             std::error_code ec, size_t size) {
@@ -389,7 +356,7 @@ void TcpServer::Connection::backward_rate_limit() {
 }
 
 void TcpServer::Connection::close() {
-    remote_socket_.close();
+    remote_stream_.reset();
     socket_.close();
 }
 

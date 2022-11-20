@@ -113,6 +113,8 @@ void SystemConnector::connect_tcp(
                 std::move(callback)(ec, nullptr);
                 return;
             }
+            // TODO(iceboy): Make this an option.
+            stream->socket().set_option(tcp::no_delay(true));
             if (initial_data.size()) {
                 send_initial_data(
                     std::move(stream), initial_data, std::move(callback));

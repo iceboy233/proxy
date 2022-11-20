@@ -4,6 +4,7 @@
 #include "base/logging.h"
 #include "net/asio.h"
 #include "net/endpoint.h"
+#include "net/proxy/system.h"
 #include "net/rate-limiter.h"
 #include "net/socks/tcp-server.h"
 
@@ -13,6 +14,7 @@ DEFINE_FLAG(uint64_t, tcp_forward_bytes_rate_limit, 0, "");
 DEFINE_FLAG(uint64_t, tcp_backward_bytes_rate_limit, 0, "");
 
 int main(int argc, char *argv[]) {
+    using namespace net;
     using namespace net::socks;
 
     base::init_logging();
@@ -20,9 +22,10 @@ int main(int argc, char *argv[]) {
 
     boost::asio::io_context io_context;
     auto executor = io_context.get_executor();
+    SystemConnector connector(executor);
     TcpServer::Options options;
     options.forward_bytes_rate_limit = flags::tcp_forward_bytes_rate_limit;
     options.backward_bytes_rate_limit = flags::tcp_backward_bytes_rate_limit;
-    TcpServer tcp_server(executor, flags::endpoint, options);
+    TcpServer tcp_server(executor, flags::endpoint, connector, options);
     io_context.run();
 }

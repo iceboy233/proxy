@@ -6,6 +6,7 @@ cc_library(
     hdrs = ["tcp-server.h"],
     deps = [
         ":wire-structs",
+        "//net/proxy:interface",
         "@com_google_absl//absl/algorithm",
         "@com_google_absl//absl/strings",
         "@org_boost_boost//:endian",

@@ -99,6 +99,7 @@ cc_binary(
     name = "socks-server",
     srcs = ["socks-server.cc"],
     deps = [
+        "//net/proxy:system",
         "//net/socks:tcp-server",
         "@org_iceboy_trunk//base:flags",
         "@org_iceboy_trunk//base:logging",

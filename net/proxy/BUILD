@@ -7,8 +7,8 @@ cc_library(
         "stream.h",
     ],
     deps = [
-        "@com_google_absl//absl/container:fixed_array",
         "@com_google_absl//absl/functional:any_invocable",
+        "@com_google_absl//absl/types:span",
         "@org_iceboy_trunk//net:asio",
     ]
 )
@@ -19,6 +19,7 @@ cc_library(
     hdrs = ["system.h"],
     deps = [
         ":interface",
+        "@com_google_absl//absl/container:fixed_array",
         "@com_google_absl//absl/strings",
         "@org_iceboy_trunk//net:asio",
     ],

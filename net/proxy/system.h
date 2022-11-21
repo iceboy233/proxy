@@ -9,21 +9,21 @@ class SystemConnector : public Connector {
 public:
     explicit SystemConnector(const any_io_executor &executor);
 
-    void connect_tcp(
+    void connect_tcp_v4(
         const address_v4 &address,
         uint16_t port,
         const_buffer initial_data,
         absl::AnyInvocable<void(
             std::error_code, std::unique_ptr<Stream>) &&> callback) override;
 
-    void connect_tcp(
+    void connect_tcp_v6(
         const address_v6 &address,
         uint16_t port,
         const_buffer initial_data,
         absl::AnyInvocable<void(
             std::error_code, std::unique_ptr<Stream>) &&> callback) override;
 
-    void connect_tcp(
+    void connect_tcp_host(
         std::string_view host,
         uint16_t port,
         const_buffer initial_data,

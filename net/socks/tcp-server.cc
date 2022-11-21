@@ -220,14 +220,14 @@ void TcpServer::Connection::connect() {
     // TODO(iceboy): send initial data during connect.
     switch (header->atyp) {
     case wire::AddressType::ipv4:
-        server_.connector_.connect_tcp(
+        server_.connector_.connect_tcp_v4(
             address_v4(header->ipv4_address),
             boost::endian::load_big_u16(&forward_buffer_[8]),
             const_buffer(),
             std::move(callback));
         break;
     case wire::AddressType::host:
-        server_.connector_.connect_tcp(
+        server_.connector_.connect_tcp_host(
             std::string_view(
                 reinterpret_cast<const char *>(&forward_buffer_[5]),
                 header->host_length),
@@ -237,7 +237,7 @@ void TcpServer::Connection::connect() {
             std::move(callback));
         break;
     case wire::AddressType::ipv6:
-        server_.connector_.connect_tcp(
+        server_.connector_.connect_tcp_v6(
             address_v6(header->ipv6_address),
             boost::endian::load_big_u16(&forward_buffer_[20]),
             const_buffer(),

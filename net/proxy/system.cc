@@ -3,6 +3,7 @@
 #include <array>
 #include <utility>
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/str_cat.h"
 #include "net/proxy/stream.h"
 
@@ -21,11 +22,11 @@ public:
     }
 
     void async_read_some(
-        const absl::FixedArray<mutable_buffer, 1> &buffers,
+        absl::Span<mutable_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
     void async_write_some(
-        const absl::FixedArray<const_buffer, 1> &buffers,
+        absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
     tcp::socket &socket() { return socket_; }
@@ -36,22 +37,26 @@ private:
 };
 
 void SystemConnector::TcpSocketStream::async_read_some(
-    const absl::FixedArray<mutable_buffer, 1> &buffers,
+    absl::Span<mutable_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
-    socket_.async_read_some(buffers, std::move(callback));
+    socket_.async_read_some(
+        absl::FixedArray<mutable_buffer, 1>(buffers.begin(), buffers.end()),
+        std::move(callback));
 }
 
 void SystemConnector::TcpSocketStream::async_write_some(
-    const absl::FixedArray<const_buffer, 1> &buffers,
+    absl::Span<const_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
-    socket_.async_write_some(buffers, std::move(callback));
+    socket_.async_write_some(
+        absl::FixedArray<const_buffer, 1>(buffers.begin(), buffers.end()),
+        std::move(callback));
 }
 
 SystemConnector::SystemConnector(const any_io_executor &executor)
     : executor_(executor),
       resolver_(executor_) {}
 
-void SystemConnector::connect_tcp(
+void SystemConnector::connect_tcp_v4(
     const address_v4 &address,
     uint16_t port,
     const_buffer initial_data,
@@ -63,7 +68,7 @@ void SystemConnector::connect_tcp(
         std::move(callback));
 }
 
-void SystemConnector::connect_tcp(
+void SystemConnector::connect_tcp_v6(
     const address_v6 &address,
     uint16_t port,
     const_buffer initial_data,
@@ -75,7 +80,7 @@ void SystemConnector::connect_tcp(
         std::move(callback));
 }
 
-void SystemConnector::connect_tcp(
+void SystemConnector::connect_tcp_host(
     std::string_view host,
     uint16_t port,
     const_buffer initial_data,

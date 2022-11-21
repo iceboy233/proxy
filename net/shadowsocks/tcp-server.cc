@@ -156,7 +156,7 @@ void TcpServer::Connection::forward_parse(absl::Span<const uint8_t> chunk) {
             close();
             return;
         }
-        server_.connector_.connect_tcp(
+        server_.connector_.connect_tcp_v4(
             address_v4(header->ipv4_address),
             boost::endian::load_big_u16(&chunk[5]),
             buffer(&chunk[7], chunk.size() - 7),
@@ -172,7 +172,7 @@ void TcpServer::Connection::forward_parse(absl::Span<const uint8_t> chunk) {
             close();
             return;
         }
-        server_.connector_.connect_tcp(
+        server_.connector_.connect_tcp_host(
             {reinterpret_cast<const char *>(&chunk[2]), host_length},
             boost::endian::load_big_u16(&chunk[host_length + 2]),
             buffer(&chunk[host_length + 4], chunk.size() - (host_length + 4)),
@@ -183,7 +183,7 @@ void TcpServer::Connection::forward_parse(absl::Span<const uint8_t> chunk) {
             close();
             return;
         }
-        server_.connector_.connect_tcp(
+        server_.connector_.connect_tcp_v6(
             address_v6(header->ipv6_address),
             boost::endian::load_big_u16(&chunk[17]),
             buffer(&chunk[19], chunk.size() - 19),

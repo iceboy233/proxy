@@ -85,6 +85,7 @@ cc_binary(
     name = "shadowsocks-server",
     srcs = ["shadowsocks-server.cc"],
     deps = [
+        "//net/proxy:system",
         "//net/shadowsocks:encryption",
         "//net/shadowsocks:tcp-server",
         "//net/shadowsocks:udp-server",

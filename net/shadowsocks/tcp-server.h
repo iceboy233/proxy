@@ -6,6 +6,7 @@
 
 #include "net/asio.h"
 #include "net/rate-limiter.h"
+#include "net/proxy/connector.h"
 #include "net/shadowsocks/encryption.h"
 #include "net/timer-list.h"
 
@@ -30,6 +31,7 @@ public:
         const any_io_executor &executor,
         const tcp::endpoint &endpoint,
         const MasterKey &master_key,
+        Connector &connector,
         const Options &options);
 
 private:
@@ -42,7 +44,7 @@ private:
     SaltFilter *salt_filter_;
     std::chrono::nanoseconds connection_timeout_;
     tcp::acceptor acceptor_;
-    tcp::resolver resolver_;
+    Connector &connector_;
     TimerList timer_list_;
     std::optional<RateLimiter> forward_bytes_rate_limiter_;
     std::optional<RateLimiter> backward_bytes_rate_limiter_;

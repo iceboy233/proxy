@@ -23,6 +23,7 @@ cc_library(
     deps = [
         ":encryption",
         ":wire-structs",
+        "//net/proxy:interface",
         "@com_google_absl//absl/types:span",
         "@com_google_absl//absl/strings",
         "@org_boost_boost//:endian",

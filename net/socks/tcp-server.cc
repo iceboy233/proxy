@@ -16,7 +16,7 @@ namespace net {
 namespace socks {
 
 class TcpServer::Connection : public boost::intrusive_ref_counter<
-    Connection, boost::thread_unsafe_counter>  {
+    Connection, boost::thread_unsafe_counter> {
 public:
     explicit Connection(TcpServer &server);
 
@@ -289,6 +289,9 @@ void TcpServer::Connection::forward_read() {
 }
 
 void TcpServer::Connection::forward_write() {
+    if (!remote_stream_) {
+        return;
+    }
     async_write(
         *remote_stream_,
         buffer(forward_buffer_.get(), forward_read_size_),
@@ -315,6 +318,9 @@ void TcpServer::Connection::forward_rate_limit() {
 }
 
 void TcpServer::Connection::backward_read() {
+    if (!remote_stream_) {
+        return;
+    }
     remote_stream_->async_read_some(
         buffer(backward_buffer_.get(), backward_buffer_size_),
         [connection = boost::intrusive_ptr<Connection>(this)](

@@ -8,6 +8,7 @@
 
 #include "absl/functional/any_invocable.h"
 #include "net/asio.h"
+#include "net/proxy/datagram.h"
 #include "net/proxy/stream.h"
 
 namespace net {
@@ -36,6 +37,12 @@ public:
         const_buffer initial_data,
         absl::AnyInvocable<void(
             std::error_code, std::unique_ptr<Stream>) &&> callback) = 0;
+
+    virtual std::error_code bind_udp_v4(
+        std::unique_ptr<Datagram> &datagram) = 0;
+
+    virtual std::error_code bind_udp_v6(
+        std::unique_ptr<Datagram> &datagram) = 0;
 };
 
 }  // namespace net

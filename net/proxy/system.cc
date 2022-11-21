@@ -36,21 +36,34 @@ private:
     tcp::socket socket_;
 };
 
-void SystemConnector::TcpSocketStream::async_read_some(
-    absl::Span<mutable_buffer const> buffers,
-    absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
-    socket_.async_read_some(
-        absl::FixedArray<mutable_buffer, 1>(buffers.begin(), buffers.end()),
-        std::move(callback));
-}
+class SystemConnector::UdpSocketDatagram : public Datagram {
+public:
+    explicit UdpSocketDatagram(const any_io_executor &executor)
+        : socket_(executor) {}
 
-void SystemConnector::TcpSocketStream::async_write_some(
-    absl::Span<const_buffer const> buffers,
-    absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
-    socket_.async_write_some(
-        absl::FixedArray<const_buffer, 1>(buffers.begin(), buffers.end()),
-        std::move(callback));
-}
+    UdpSocketDatagram(const UdpSocketDatagram &) = delete;
+    UdpSocketDatagram &operator=(const UdpSocketDatagram &) = delete;
+
+    void async_receive_from(
+        absl::Span<mutable_buffer const> buffers,
+        udp::endpoint &endpoint,
+        absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
+
+    void async_send_to(
+        absl::Span<const_buffer const> buffers,
+        const udp::endpoint &endpoint,
+        absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
+
+    any_io_executor get_executor() override {
+        return socket_.get_executor();
+    }
+
+    udp::socket &socket() { return socket_; }
+    const udp::socket &socket() const { return socket_; }
+
+private:
+    udp::socket socket_;
+};
 
 SystemConnector::SystemConnector(const any_io_executor &executor)
     : executor_(executor),
@@ -100,6 +113,30 @@ void SystemConnector::connect_tcp_host(
     });
 }
 
+std::error_code SystemConnector::bind_udp_v4(
+    std::unique_ptr<Datagram> &datagram) {
+    auto new_datagram = std::make_unique<UdpSocketDatagram>(executor_);
+    boost::system::error_code ec;
+    new_datagram->socket().open(udp::v4(), ec);
+    if (ec) {
+        return ec;
+    }
+    datagram = std::move(new_datagram);
+    return {};
+}
+
+std::error_code SystemConnector::bind_udp_v6(
+    std::unique_ptr<Datagram> &datagram) {
+    auto new_datagram = std::make_unique<UdpSocketDatagram>(executor_);
+    boost::system::error_code ec;
+    new_datagram->socket().open(udp::v6(), ec);
+    if (ec) {
+        return ec;
+    }
+    datagram = std::move(new_datagram);
+    return {};
+}
+
 template <typename EndpointsT>
 void SystemConnector::connect_tcp(
     const EndpointsT &endpoints,
@@ -146,6 +183,42 @@ void SystemConnector::send_initial_data(
         }
         std::move(callback)({}, std::move(stream));
     });
+}
+
+void SystemConnector::TcpSocketStream::async_read_some(
+    absl::Span<mutable_buffer const> buffers,
+    absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
+    socket_.async_read_some(
+        absl::FixedArray<mutable_buffer, 1>(buffers.begin(), buffers.end()),
+        std::move(callback));
+}
+
+void SystemConnector::TcpSocketStream::async_write_some(
+    absl::Span<const_buffer const> buffers,
+    absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
+    socket_.async_write_some(
+        absl::FixedArray<const_buffer, 1>(buffers.begin(), buffers.end()),
+        std::move(callback));
+}
+
+void SystemConnector::UdpSocketDatagram::async_receive_from(
+    absl::Span<mutable_buffer const> buffers,
+    udp::endpoint &endpoint,
+    absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
+    socket_.async_receive_from(
+        absl::FixedArray<mutable_buffer, 1>(buffers.begin(), buffers.end()),
+        endpoint,
+        std::move(callback));
+}
+
+void SystemConnector::UdpSocketDatagram::async_send_to(
+    absl::Span<const_buffer const> buffers,
+    const udp::endpoint &endpoint,
+    absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
+    socket_.async_send_to(
+        absl::FixedArray<const_buffer, 1>(buffers.begin(), buffers.end()),
+        endpoint,
+        std::move(callback));
 }
 
 }  // namespace net

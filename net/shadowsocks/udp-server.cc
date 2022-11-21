@@ -10,6 +10,7 @@
 #include "boost/endian/conversion.hpp"
 #include "boost/smart_ptr/intrusive_ptr.hpp"
 #include "boost/smart_ptr/intrusive_ref_counter.hpp"
+#include "net/proxy/datagram.h"
 #include "net/shadowsocks/wire-structs.h"
 
 namespace net {
@@ -21,7 +22,8 @@ public:
     Connection(
         UdpServer &server,
         const udp::endpoint &client_endpoint,
-        bool is_v6);
+        bool is_v6,
+        std::unique_ptr<Datagram> remote_datagram);
     ~Connection();
 
     void forward_send(
@@ -37,7 +39,7 @@ private:
     UdpServer &server_;
     udp::endpoint client_endpoint_;
     bool is_v6_;
-    udp::socket remote_socket_;
+    std::unique_ptr<Datagram> remote_datagram_;
     std::optional<TimerList::Timer> timer_;
     std::unique_ptr<uint8_t[]> backward_buffer_;
     static constexpr size_t backward_buffer_size_ = 65535 - 48;
@@ -50,12 +52,14 @@ UdpServer::UdpServer(
     const any_io_executor &executor,
     const udp::endpoint &endpoint,
     const MasterKey &master_key,
+    Connector &connector,
     const Options &options)
     : executor_(executor),
       salt_filter_(options.salt_filter),
       connection_timeout_(options.connection_timeout),
       socket_(executor, endpoint),
       encrypted_datagram_(socket_, master_key, salt_filter_),
+      connector_(connector),
       timer_list_(executor_, connection_timeout_) {
     if (options.forward_packets_rate_limit) {
         forward_packets_rate_limiter_.emplace(
@@ -135,8 +139,20 @@ void UdpServer::forward_dispatch(
     if (iter != connections_.end()) {
         iter->second->forward_send(chunk, server_endpoint);
     } else {
+        std::unique_ptr<Datagram> datagram;
+        std::error_code ec;
+        if (!server_endpoint.address().is_v6()) {
+            ec = connector_.bind_udp_v4(datagram);
+        } else {
+            ec = connector_.bind_udp_v6(datagram);
+        }
+        if (ec) {
+            forward_receive();
+            return;
+        }
         boost::intrusive_ptr<Connection> connection(new Connection(
-            *this, receive_endpoint_, server_endpoint.address().is_v6()));
+            *this, receive_endpoint_, server_endpoint.address().is_v6(),
+            std::move(datagram)));
         connection->forward_send(chunk, server_endpoint);
         connection->backward_receive();
         connection->set_timer();
@@ -146,11 +162,12 @@ void UdpServer::forward_dispatch(
 UdpServer::Connection::Connection(
     UdpServer &server,
     const udp::endpoint &client_endpoint,
-    bool is_v6)
+    bool is_v6,
+    std::unique_ptr<Datagram> remote_datagram)
     : server_(server),
       client_endpoint_(client_endpoint),
       is_v6_(is_v6),
-      remote_socket_(server_.executor_, {!is_v6_ ? udp::v4() : udp::v6(), 0}),
+      remote_datagram_(std::move(remote_datagram)),
       backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)) {
     server_.connections_.emplace(
         std::make_tuple(client_endpoint_, is_v6_), this);
@@ -162,7 +179,10 @@ UdpServer::Connection::~Connection() {
 
 void UdpServer::Connection::forward_send(
     absl::Span<const uint8_t> chunk, const udp::endpoint &endpoint) {
-    remote_socket_.async_send_to(
+    if (!remote_datagram_) {
+        return;
+    }
+    remote_datagram_->async_send_to(
         buffer(chunk.data(), chunk.size()),
         endpoint,
         [connection = boost::intrusive_ptr<Connection>(this)](
@@ -173,7 +193,10 @@ void UdpServer::Connection::forward_send(
 }
 
 void UdpServer::Connection::backward_receive() {
-    remote_socket_.async_receive_from(
+    if (!remote_datagram_) {
+        return;
+    }
+    remote_datagram_->async_receive_from(
         buffer(
             &backward_buffer_[reserve_header_size_],
             backward_buffer_size_ - reserve_header_size_),
@@ -246,7 +269,7 @@ void UdpServer::Connection::update_timer() {
 
 void UdpServer::Connection::close() {
     timer_.reset();
-    remote_socket_.close();
+    remote_datagram_.reset();
 }
 
 }  // namespace shadowsocks

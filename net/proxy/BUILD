@@ -4,6 +4,7 @@ cc_library(
     name = "interface",
     hdrs = [
         "connector.h",
+        "datagram.h",
         "stream.h",
     ],
     deps = [

@@ -9,6 +9,7 @@
 #include "absl/types/span.h"
 #include "net/asio.h"
 #include "net/asio-hash.h"
+#include "net/proxy/connector.h"
 #include "net/rate-limiter.h"
 #include "net/shadowsocks/encryption.h"
 #include "net/timer-list.h"
@@ -34,6 +35,7 @@ public:
         const any_io_executor &executor,
         const udp::endpoint &endpoint,
         const MasterKey &master_key,
+        Connector &connector,
         const Options &options);
 
 private:
@@ -50,6 +52,7 @@ private:
     std::chrono::nanoseconds connection_timeout_;
     udp::socket socket_;
     EncryptedDatagram encrypted_datagram_;
+    Connector &connector_;
     TimerList timer_list_;
     absl::flat_hash_map<std::tuple<udp::endpoint, bool>, Connection *>
         connections_;

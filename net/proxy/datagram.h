@@ -1,5 +1,5 @@
-#ifndef _NET_PROXY_STREAM_H
-#define _NET_PROXY_STREAM_H
+#ifndef _NET_PROXY_DATAGRAM_H
+#define _NET_PROXY_DATAGRAM_H
 
 #include <cstddef>
 #include <system_error>
@@ -11,54 +11,62 @@
 
 namespace net {
 
-class Stream {
+class Datagram {
 public:
     using executor_type = any_io_executor;
 
-    virtual ~Stream() = default;
+    virtual ~Datagram() = default;
     virtual any_io_executor get_executor() = 0;
 
-    virtual void async_read_some(
+    virtual void async_receive_from(
         absl::Span<mutable_buffer const> buffers,
+        udp::endpoint &endpoint,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) = 0;
 
-    virtual void async_write_some(
+    virtual void async_send_to(
         absl::Span<const_buffer const> buffers,
+        const udp::endpoint &endpoint,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) = 0;
 
     template <typename BuffersT>
-    void async_read_some(
+    void async_receive_from(
         const BuffersT &buffers,
+        udp::endpoint &endpoint,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback);
 
     template <typename BuffersT>
-    void async_write_some(
+    void async_send_to(
         const BuffersT &buffers,
+        const udp::endpoint &endpoint,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback);
 };
 
 template <typename BuffersT>
-void Stream::async_read_some(
+void Datagram::async_receive_from(
     const BuffersT &buffers,
+    udp::endpoint &endpoint,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
-    async_read_some(
+    async_receive_from(
         absl::Span<mutable_buffer const>(
             buffer_sequence_begin(buffers),
             buffer_sequence_end(buffers) - buffer_sequence_begin(buffers)),
+        endpoint,
         std::move(callback));
 }
 
 template <typename BuffersT>
-void Stream::async_write_some(
+void Datagram::async_send_to(
     const BuffersT &buffers,
+    const udp::endpoint &endpoint,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
-    async_write_some(
+    async_send_to(
         absl::Span<const_buffer const>(
             buffer_sequence_begin(buffers),
             buffer_sequence_end(buffers) - buffer_sequence_begin(buffers)),
+        endpoint,
         std::move(callback));
 }
 
 }  // namespace net
 
-#endif  // _NET_PROXY_STREAM_H
+#endif  // _NET_PROXY_DATAGRAM_H

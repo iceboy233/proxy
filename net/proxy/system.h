@@ -30,8 +30,12 @@ public:
         absl::AnyInvocable<void(
             std::error_code, std::unique_ptr<Stream>) &&> callback) override;
 
+    std::error_code bind_udp_v4(std::unique_ptr<Datagram> &datagram) override;
+    std::error_code bind_udp_v6(std::unique_ptr<Datagram> &datagram) override;
+
 private:
     class TcpSocketStream;
+    class UdpSocketDatagram;
 
     template <typename EndpointsT>
     void connect_tcp(

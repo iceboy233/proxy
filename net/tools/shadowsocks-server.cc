@@ -53,6 +53,7 @@ void create_tcp_server(
 void create_udp_server(
     const any_io_executor &executor,
     const MasterKey &master_key,
+    Connector &connector,
     std::optional<SaltFilter> &salt_filter,
     std::optional<UdpServer> &udp_server) {
     UdpServer::Options options;
@@ -64,7 +65,8 @@ void create_udp_server(
     options.forward_packets_rate_limit = flags::udp_forward_packets_rate_limit;
     options.backward_packets_rate_limit =
         flags::udp_backward_packets_rate_limit;
-    udp_server.emplace(executor, flags::endpoint, master_key, options);
+    udp_server.emplace(
+        executor, flags::endpoint, master_key, connector, options);
 }
 
 }  // namespace
@@ -94,7 +96,8 @@ int main(int argc, char *argv[]) {
     }
     std::optional<UdpServer> udp_server;
     if (flags::enable_udp) {
-        create_udp_server(executor, master_key, salt_filter, udp_server);
+        create_udp_server(
+            executor, master_key, connector, salt_filter, udp_server);
     }
     io_context.run();
 }

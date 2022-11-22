@@ -23,7 +23,7 @@ public:
         UdpServer &server,
         const udp::endpoint &client_endpoint,
         bool is_v6,
-        std::unique_ptr<Datagram> remote_datagram);
+        std::unique_ptr<proxy::Datagram> remote_datagram);
     ~Connection();
 
     void forward_send(
@@ -39,7 +39,7 @@ private:
     UdpServer &server_;
     udp::endpoint client_endpoint_;
     bool is_v6_;
-    std::unique_ptr<Datagram> remote_datagram_;
+    std::unique_ptr<proxy::Datagram> remote_datagram_;
     std::optional<TimerList::Timer> timer_;
     std::unique_ptr<uint8_t[]> backward_buffer_;
     static constexpr size_t backward_buffer_size_ = 65535 - 48;
@@ -52,7 +52,7 @@ UdpServer::UdpServer(
     const any_io_executor &executor,
     const udp::endpoint &endpoint,
     const MasterKey &master_key,
-    Connector &connector,
+    proxy::Connector &connector,
     const Options &options)
     : executor_(executor),
       salt_filter_(options.salt_filter),
@@ -139,7 +139,7 @@ void UdpServer::forward_dispatch(
     if (iter != connections_.end()) {
         iter->second->forward_send(chunk, server_endpoint);
     } else {
-        std::unique_ptr<Datagram> datagram;
+        std::unique_ptr<proxy::Datagram> datagram;
         std::error_code ec;
         if (!server_endpoint.address().is_v6()) {
             ec = connector_.bind_udp_v4(datagram);
@@ -163,7 +163,7 @@ UdpServer::Connection::Connection(
     UdpServer &server,
     const udp::endpoint &client_endpoint,
     bool is_v6,
-    std::unique_ptr<Datagram> remote_datagram)
+    std::unique_ptr<proxy::Datagram> remote_datagram)
     : server_(server),
       client_endpoint_(client_endpoint),
       is_v6_(is_v6),

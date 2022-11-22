@@ -31,7 +31,7 @@ public:
         const any_io_executor &executor,
         const tcp::endpoint &endpoint,
         const MasterKey &master_key,
-        Connector &connector,
+        proxy::Connector &connector,
         const Options &options);
 
 private:
@@ -44,7 +44,7 @@ private:
     SaltFilter *salt_filter_;
     std::chrono::nanoseconds connection_timeout_;
     tcp::acceptor acceptor_;
-    Connector &connector_;
+    proxy::Connector &connector_;
     TimerList timer_list_;
     std::optional<RateLimiter> forward_bytes_rate_limiter_;
     std::optional<RateLimiter> backward_bytes_rate_limiter_;

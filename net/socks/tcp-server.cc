@@ -42,7 +42,7 @@ private:
 
     TcpServer &server_;
     tcp::socket socket_;
-    std::unique_ptr<Stream> remote_stream_;
+    std::unique_ptr<proxy::Stream> remote_stream_;
     std::unique_ptr<uint8_t[]> forward_buffer_;
     static constexpr size_t forward_buffer_size_ = 16384;
     size_t forward_read_size_;
@@ -54,7 +54,7 @@ private:
 TcpServer::TcpServer(
     const any_io_executor &executor,
     const tcp::endpoint &endpoint,
-    Connector &connector,
+    proxy::Connector &connector,
     const Options &options)
     : executor_(executor),
       acceptor_(executor_, endpoint),
@@ -207,7 +207,7 @@ void TcpServer::Connection::connect() {
     const auto *header =
         reinterpret_cast<wire::RequestHeader *>(forward_buffer_.get());
     auto callback = [connection = boost::intrusive_ptr<Connection>(this)](
-        std::error_code ec, std::unique_ptr<Stream> stream) {
+        std::error_code ec, std::unique_ptr<proxy::Stream> stream) {
         if (ec) {
             connection->close();
             return;

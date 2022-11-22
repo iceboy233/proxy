@@ -1,13 +1,18 @@
-#ifndef _NET_PROXY_SYSTEM_H
-#define _NET_PROXY_SYSTEM_H
+#ifndef _NET_PROXY_SYSTEM_CONNECTOR_H
+#define _NET_PROXY_SYSTEM_CONNECTOR_H
 
 #include "net/proxy/connector.h"
 
 namespace net {
+namespace proxy {
+namespace system {
 
-class SystemConnector : public Connector {
+class Connector : public proxy::Connector {
 public:
-    explicit SystemConnector(const any_io_executor &executor);
+    explicit Connector(const any_io_executor &executor);
+
+    Connector(const Connector &) = delete;
+    Connector &operator=(const Connector &) = delete;
 
     void connect_tcp_v4(
         const address_v4 &address,
@@ -54,6 +59,8 @@ private:
     tcp::resolver resolver_;
 };
 
+}  // namespace proxy
+}  // namespace system
 }  // namespace net
 
-#endif  // _NET_PROXY_SYSTEM_H
+#endif  // _NET_PROXY_SYSTEM_CONNECTOR_H

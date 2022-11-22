@@ -10,6 +10,7 @@
 #include "net/asio.h"
 
 namespace net {
+namespace proxy {
 
 class Stream {
 public:
@@ -59,6 +60,7 @@ void Stream::async_write_some(
         std::move(callback));
 }
 
+}  // namespace proxy
 }  // namespace net
 
 #endif  // _NET_PROXY_STREAM_H

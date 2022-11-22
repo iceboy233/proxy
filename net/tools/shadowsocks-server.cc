@@ -6,7 +6,7 @@
 #include "base/logging.h"
 #include "net/asio.h"
 #include "net/endpoint.h"
-#include "net/proxy/system.h"
+#include "net/proxy/system/connector.h"
 #include "net/shadowsocks/encryption.h"
 #include "net/shadowsocks/tcp-server.h"
 #include "net/shadowsocks/udp-server.h"
@@ -35,7 +35,7 @@ namespace {
 void create_tcp_server(
     const any_io_executor &executor,
     const MasterKey &master_key,
-    Connector &connector,
+    proxy::Connector &connector,
     std::optional<SaltFilter> &salt_filter,
     std::optional<TcpServer> &tcp_server) {
     TcpServer::Options options;
@@ -53,7 +53,7 @@ void create_tcp_server(
 void create_udp_server(
     const any_io_executor &executor,
     const MasterKey &master_key,
-    Connector &connector,
+    proxy::Connector &connector,
     std::optional<SaltFilter> &salt_filter,
     std::optional<UdpServer> &udp_server) {
     UdpServer::Options options;
@@ -74,7 +74,6 @@ void create_udp_server(
 }  // namespace net
 
 int main(int argc, char *argv[]) {
-    using namespace net;
     using namespace net::shadowsocks;
 
     base::init_logging();
@@ -84,7 +83,7 @@ int main(int argc, char *argv[]) {
     auto executor = io_context.get_executor();
     MasterKey master_key;
     master_key.init(flags::method, flags::password);
-    SystemConnector connector(executor);
+    net::proxy::system::Connector connector(executor);
     std::optional<SaltFilter> salt_filter;
     if (flags::detect_salt_reuse) {
         salt_filter.emplace();

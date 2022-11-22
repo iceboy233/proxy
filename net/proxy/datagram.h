@@ -10,6 +10,7 @@
 #include "net/asio.h"
 
 namespace net {
+namespace proxy {
 
 class Datagram {
 public:
@@ -67,6 +68,7 @@ void Datagram::async_send_to(
         std::move(callback));
 }
 
+}  // namespace proxy
 }  // namespace net
 
 #endif  // _NET_PROXY_DATAGRAM_H

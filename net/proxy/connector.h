@@ -12,6 +12,7 @@
 #include "net/proxy/stream.h"
 
 namespace net {
+namespace proxy {
 
 class Connector {
 public:
@@ -45,6 +46,7 @@ public:
         std::unique_ptr<Datagram> &datagram) = 0;
 };
 
+}  // namespace proxy
 }  // namespace net
 
 #endif  // _NET_PROXY_CONNECTOR_H

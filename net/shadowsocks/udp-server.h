@@ -35,7 +35,7 @@ public:
         const any_io_executor &executor,
         const udp::endpoint &endpoint,
         const MasterKey &master_key,
-        Connector &connector,
+        proxy::Connector &connector,
         const Options &options);
 
 private:
@@ -52,7 +52,7 @@ private:
     std::chrono::nanoseconds connection_timeout_;
     udp::socket socket_;
     EncryptedDatagram encrypted_datagram_;
-    Connector &connector_;
+    proxy::Connector &connector_;
     TimerList timer_list_;
     absl::flat_hash_map<std::tuple<udp::endpoint, bool>, Connection *>
         connections_;

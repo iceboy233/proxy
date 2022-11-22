@@ -1,4 +1,4 @@
-#include "net/proxy/system.h"
+#include "net/proxy/system/connector.h"
 
 #include <array>
 #include <utility>
@@ -8,8 +8,10 @@
 #include "net/proxy/stream.h"
 
 namespace net {
+namespace proxy {
+namespace system {
 
-class SystemConnector::TcpSocketStream : public Stream {
+class Connector::TcpSocketStream : public Stream {
 public:
     explicit TcpSocketStream(const any_io_executor &executor)
         : socket_(executor) {}
@@ -36,7 +38,7 @@ private:
     tcp::socket socket_;
 };
 
-class SystemConnector::UdpSocketDatagram : public Datagram {
+class Connector::UdpSocketDatagram : public Datagram {
 public:
     explicit UdpSocketDatagram(const any_io_executor &executor)
         : socket_(executor) {}
@@ -65,11 +67,11 @@ private:
     udp::socket socket_;
 };
 
-SystemConnector::SystemConnector(const any_io_executor &executor)
+Connector::Connector(const any_io_executor &executor)
     : executor_(executor),
       resolver_(executor_) {}
 
-void SystemConnector::connect_tcp_v4(
+void Connector::connect_tcp_v4(
     const address_v4 &address,
     uint16_t port,
     const_buffer initial_data,
@@ -81,7 +83,7 @@ void SystemConnector::connect_tcp_v4(
         std::move(callback));
 }
 
-void SystemConnector::connect_tcp_v6(
+void Connector::connect_tcp_v6(
     const address_v6 &address,
     uint16_t port,
     const_buffer initial_data,
@@ -93,7 +95,7 @@ void SystemConnector::connect_tcp_v6(
         std::move(callback));
 }
 
-void SystemConnector::connect_tcp_host(
+void Connector::connect_tcp_host(
     std::string_view host,
     uint16_t port,
     const_buffer initial_data,
@@ -113,8 +115,7 @@ void SystemConnector::connect_tcp_host(
     });
 }
 
-std::error_code SystemConnector::bind_udp_v4(
-    std::unique_ptr<Datagram> &datagram) {
+std::error_code Connector::bind_udp_v4(std::unique_ptr<Datagram> &datagram) {
     auto new_datagram = std::make_unique<UdpSocketDatagram>(executor_);
     boost::system::error_code ec;
     new_datagram->socket().open(udp::v4(), ec);
@@ -125,8 +126,7 @@ std::error_code SystemConnector::bind_udp_v4(
     return {};
 }
 
-std::error_code SystemConnector::bind_udp_v6(
-    std::unique_ptr<Datagram> &datagram) {
+std::error_code Connector::bind_udp_v6(std::unique_ptr<Datagram> &datagram) {
     auto new_datagram = std::make_unique<UdpSocketDatagram>(executor_);
     boost::system::error_code ec;
     new_datagram->socket().open(udp::v6(), ec);
@@ -138,7 +138,7 @@ std::error_code SystemConnector::bind_udp_v6(
 }
 
 template <typename EndpointsT>
-void SystemConnector::connect_tcp(
+void Connector::connect_tcp(
     const EndpointsT &endpoints,
     const_buffer initial_data,
     absl::AnyInvocable<void(
@@ -166,7 +166,7 @@ void SystemConnector::connect_tcp(
         });
 }
 
-void SystemConnector::send_initial_data(
+void Connector::send_initial_data(
     std::unique_ptr<TcpSocketStream> stream,
     const_buffer initial_data,
     absl::AnyInvocable<void(
@@ -185,7 +185,7 @@ void SystemConnector::send_initial_data(
     });
 }
 
-void SystemConnector::TcpSocketStream::async_read_some(
+void Connector::TcpSocketStream::async_read_some(
     absl::Span<mutable_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
     socket_.async_read_some(
@@ -193,7 +193,7 @@ void SystemConnector::TcpSocketStream::async_read_some(
         std::move(callback));
 }
 
-void SystemConnector::TcpSocketStream::async_write_some(
+void Connector::TcpSocketStream::async_write_some(
     absl::Span<const_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
     socket_.async_write_some(
@@ -201,7 +201,7 @@ void SystemConnector::TcpSocketStream::async_write_some(
         std::move(callback));
 }
 
-void SystemConnector::UdpSocketDatagram::async_receive_from(
+void Connector::UdpSocketDatagram::async_receive_from(
     absl::Span<mutable_buffer const> buffers,
     udp::endpoint &endpoint,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
@@ -211,7 +211,7 @@ void SystemConnector::UdpSocketDatagram::async_receive_from(
         std::move(callback));
 }
 
-void SystemConnector::UdpSocketDatagram::async_send_to(
+void Connector::UdpSocketDatagram::async_send_to(
     absl::Span<const_buffer const> buffers,
     const udp::endpoint &endpoint,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
@@ -221,4 +221,6 @@ void SystemConnector::UdpSocketDatagram::async_send_to(
         std::move(callback));
 }
 
+}  // namespace system
+}  // namespace proxy
 }  // namespace net

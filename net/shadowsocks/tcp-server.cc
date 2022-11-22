@@ -40,7 +40,7 @@ private:
 
     TcpServer &server_;
     tcp::socket socket_;
-    std::unique_ptr<Stream> remote_stream_;
+    std::unique_ptr<proxy::Stream> remote_stream_;
     std::optional<TimerList::Timer> timer_;
     std::unique_ptr<uint8_t[]> backward_buffer_;
     static constexpr size_t backward_buffer_size_ = 16383;
@@ -52,7 +52,7 @@ TcpServer::TcpServer(
     const any_io_executor &executor,
     const tcp::endpoint &endpoint,
     const MasterKey &master_key,
-    Connector &connector,
+    proxy::Connector &connector,
     const Options &options)
     : executor_(executor),
       master_key_(master_key),
@@ -139,7 +139,7 @@ void TcpServer::Connection::forward_parse(absl::Span<const uint8_t> chunk) {
     const auto *header =
         reinterpret_cast<const wire::AddressHeader *>(chunk.data());
     auto callback = [connection = boost::intrusive_ptr<Connection>(this)](
-        std::error_code ec, std::unique_ptr<Stream> stream) {
+        std::error_code ec, std::unique_ptr<proxy::Stream> stream) {
         if (ec) {
             connection->close();
             return;

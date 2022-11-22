@@ -51,11 +51,11 @@ private:
 TcpServer::TcpServer(
     const any_io_executor &executor,
     const tcp::endpoint &endpoint,
-    const MasterKey &master_key,
+    const proxy::shadowsocks::PreSharedKey &pre_shared_key,
     proxy::Connector &connector,
     const Options &options)
     : executor_(executor),
-      master_key_(master_key),
+      pre_shared_key_(pre_shared_key),
       salt_filter_(options.salt_filter),
       connection_timeout_(options.connection_timeout),
       acceptor_(executor_, endpoint),
@@ -85,7 +85,8 @@ TcpServer::Connection::Connection(TcpServer &server)
     : server_(server),
       socket_(server_.executor_),
       backward_buffer_(std::make_unique<uint8_t[]>(backward_buffer_size_)),
-      encrypted_stream_(socket_, server_.master_key_, server_.salt_filter_) {}
+      encrypted_stream_(
+          socket_, server_.pre_shared_key_, server_.salt_filter_) {}
 
 void TcpServer::Connection::accept() {
     server_.acceptor_.async_accept(

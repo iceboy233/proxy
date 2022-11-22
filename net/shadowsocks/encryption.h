@@ -10,46 +10,17 @@
 #include <string_view>
 #include <system_error>
 #include <utility>
-#include <boost/endian/arithmetic.hpp>
 #include <boost/endian/conversion.hpp>
 
 #include "absl/types/span.h"
 #include "net/asio.h"
+#include "net/proxy/shadowsocks/pre-shared-key.h"
+#include "net/proxy/shadowsocks/session-subkey.h"
 #include "net/stream/reader.h"
 #include "util/hash-filter.h"
 
 namespace net {
 namespace shadowsocks {
-
-class MasterKey {
-public:
-    void init(std::string_view method, std::string_view password);
-
-    const EVP_AEAD *aead() const { return aead_; }
-    uint8_t *data() { return key_.data(); }
-    const uint8_t *data() const { return key_.data(); }
-    size_t size() const { return EVP_AEAD_key_length(aead_); }
-
-private:
-    const EVP_AEAD *aead_;
-    std::array<uint8_t, 32> key_;
-};
-
-class SessionKey {
-public:
-    SessionKey(const MasterKey &master_key, const uint8_t *salt);
-    ~SessionKey();
-
-    void encrypt(
-        absl::Span<const uint8_t> in, uint8_t *out, uint8_t out_tag[16]);
-    bool decrypt(
-        absl::Span<const uint8_t> in, const uint8_t in_tag[16], uint8_t *out);
-
-private:
-    EVP_AEAD_CTX aead_ctx_;
-    std::array<boost::endian::little_uint64_t, 3> nonce_ = {};
-    static_assert(sizeof(nonce_) == 24);
-};
 
 class SaltFilter {
 public:
@@ -69,7 +40,7 @@ class EncryptedStream {
 public:
     EncryptedStream(
         tcp::socket &socket,
-        const MasterKey &master_key,
+        const proxy::shadowsocks::PreSharedKey &pre_shared_key,
         SaltFilter *salt_filter);
 
     template <typename CallbackT>
@@ -92,20 +63,20 @@ private:
     void read_discard(CallbackT &&callback);
 
     tcp::socket &socket_;
-    const MasterKey &master_key_;
+    const proxy::shadowsocks::PreSharedKey &pre_shared_key_;
     SaltFilter *salt_filter_;
     stream::Reader reader_;
     std::unique_ptr<uint8_t[]> write_buffer_;
     static constexpr size_t write_buffer_size_ = 16384 + 66;
-    std::optional<SessionKey> read_key_;
-    std::optional<SessionKey> write_key_;
+    std::optional<proxy::shadowsocks::SessionSubkey> read_key_;
+    std::optional<proxy::shadowsocks::SessionSubkey> write_key_;
 };
 
 class EncryptedDatagram {
 public:
     EncryptedDatagram(
         udp::socket &socket,
-        const MasterKey &master_key,
+        const proxy::shadowsocks::PreSharedKey &pre_shared_key,
         SaltFilter *salt_filter);
 
     template <typename CallbackT>
@@ -119,7 +90,7 @@ public:
 
 private:
     udp::socket &socket_;
-    const MasterKey &master_key_;
+    const proxy::shadowsocks::PreSharedKey &pre_shared_key_;
     SaltFilter *salt_filter_;
     std::unique_ptr<uint8_t[]> read_buffer_;
     static constexpr size_t read_buffer_size_ = 65535;
@@ -141,13 +112,14 @@ void EncryptedStream::write(
     absl::Span<const uint8_t> chunk, CallbackT &&callback) {
     size_t offset = 0;
     if (!write_key_) {
-        size_t key_size = EVP_AEAD_key_length(master_key_.aead());
-        RAND_bytes(&write_buffer_[0], key_size);
+        size_t salt_size = pre_shared_key_.method().salt_size();
+        RAND_bytes(&write_buffer_[0], salt_size);
         if (salt_filter_) {
-            salt_filter_->insert({&write_buffer_[0], key_size});
+            salt_filter_->insert({&write_buffer_[0], salt_size});
         }
-        write_key_.emplace(master_key_, &write_buffer_[0]);
-        offset = key_size;
+        write_key_.emplace();
+        write_key_->init(pre_shared_key_, &write_buffer_[0]);
+        offset = salt_size;
     }
     boost::endian::store_big_u16(&write_buffer_[offset], chunk.size());
     write_key_->encrypt(
@@ -170,27 +142,30 @@ template <typename CallbackT>
 void EncryptedStream::read_header(CallbackT &&callback) {
     reader_.read(
         socket_,
-        EVP_AEAD_key_length(master_key_.aead()) + 18,
+        pre_shared_key_.method().salt_size() + 18,
         [this, callback = std::forward<CallbackT>(callback)](
             std::error_code ec) mutable {
             if (ec) {
                 callback(ec, {});
                 return;
             }
-            size_t key_size = EVP_AEAD_key_length(master_key_.aead());
-            uint8_t *data = reader_.consume(key_size + 18);
-            read_key_.emplace(master_key_, data);
+            size_t salt_size = pre_shared_key_.method().salt_size();
+            uint8_t *data = reader_.consume(salt_size + 18);
+            read_key_.emplace();
+            read_key_->init(pre_shared_key_, data);
             if (!read_key_->decrypt(
-                {&data[key_size], 2}, &data[key_size + 2], &data[key_size])) {
+                {&data[salt_size], 2},
+                &data[salt_size + 2],
+                &data[salt_size])) {
                 read_discard(std::forward<CallbackT>(callback));
                 return;
             }
             if (salt_filter_ &&
-                !salt_filter_->test_and_insert({data, key_size})) {
+                !salt_filter_->test_and_insert({data, salt_size})) {
                 read_discard(std::forward<CallbackT>(callback));
                 return;
             }
-            size_t length = boost::endian::load_big_u16(&data[key_size]);
+            size_t length = boost::endian::load_big_u16(&data[salt_size]);
             if (length >= 16384) {
                 read_discard(std::forward<CallbackT>(callback));
                 return;
@@ -272,26 +247,27 @@ void EncryptedDatagram::receive_from(
                 callback(ec, {});
                 return;
             }
-            size_t key_size = EVP_AEAD_key_length(master_key_.aead());
-            if (size < key_size + 16) {
+            size_t salt_size = pre_shared_key_.method().salt_size();
+            if (size < salt_size + 16) {
                 callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
-            size_t payload_size = size - key_size - 16;
-            SessionKey read_key(master_key_, &read_buffer_[0]);
+            size_t payload_size = size - salt_size - 16;
+            proxy::shadowsocks::SessionSubkey read_key;
+            read_key.init(pre_shared_key_, &read_buffer_[0]);
             if (!read_key.decrypt(
-                {&read_buffer_[key_size], payload_size},
-                &read_buffer_[key_size + payload_size],
-                &read_buffer_[key_size])) {
+                {&read_buffer_[salt_size], payload_size},
+                &read_buffer_[salt_size + payload_size],
+                &read_buffer_[salt_size])) {
                 callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
             if (salt_filter_ &&
-                !salt_filter_->test_and_insert({&read_buffer_[0], key_size})) {
+                !salt_filter_->test_and_insert({&read_buffer_[0], salt_size})) {
                 callback(make_error_code(std::errc::result_out_of_range), {});
                 return;
             }
-            callback({}, {&read_buffer_[key_size], payload_size});
+            callback({}, {&read_buffer_[salt_size], payload_size});
         });
 }
 
@@ -300,18 +276,19 @@ void EncryptedDatagram::send_to(
     absl::Span<const uint8_t> chunk,
     const udp::endpoint &endpoint,
     CallbackT &&callback) {
-    size_t key_size = EVP_AEAD_key_length(master_key_.aead());
-    RAND_bytes(&write_buffer_[0], key_size);
+    size_t salt_size = pre_shared_key_.method().salt_size();
+    RAND_bytes(&write_buffer_[0], salt_size);
     if (salt_filter_) {
-        salt_filter_->insert({&write_buffer_[0], key_size});
+        salt_filter_->insert({&write_buffer_[0], salt_size});
     }
-    SessionKey write_key(master_key_, &write_buffer_[0]);
+    proxy::shadowsocks::SessionSubkey write_key;
+    write_key.init(pre_shared_key_, &write_buffer_[0]);
     write_key.encrypt(
         chunk,
-        &write_buffer_[key_size],
-        &write_buffer_[key_size + chunk.size()]);
+        &write_buffer_[salt_size],
+        &write_buffer_[salt_size + chunk.size()]);
     socket_.async_send_to(
-        buffer(&write_buffer_[0], key_size + chunk.size() + 16),
+        buffer(&write_buffer_[0], salt_size + chunk.size() + 16),
         endpoint,
         [this, callback = std::forward<CallbackT>(callback)](
             std::error_code ec, size_t) mutable {

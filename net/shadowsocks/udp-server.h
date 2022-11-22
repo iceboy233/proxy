@@ -34,7 +34,7 @@ public:
     UdpServer(
         const any_io_executor &executor,
         const udp::endpoint &endpoint,
-        const MasterKey &master_key,
+        const proxy::shadowsocks::PreSharedKey &pre_shared_key,
         proxy::Connector &connector,
         const Options &options);
 

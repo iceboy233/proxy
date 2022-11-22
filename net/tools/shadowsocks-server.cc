@@ -1,11 +1,14 @@
 #include <chrono>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 
 #include "base/flags.h"
 #include "base/logging.h"
 #include "net/asio.h"
 #include "net/endpoint.h"
+#include "net/proxy/shadowsocks/method.h"
+#include "net/proxy/shadowsocks/pre-shared-key.h"
 #include "net/proxy/system/connector.h"
 #include "net/shadowsocks/encryption.h"
 #include "net/shadowsocks/tcp-server.h"
@@ -32,9 +35,11 @@ namespace net {
 namespace shadowsocks {
 namespace {
 
+using namespace net::proxy::shadowsocks;
+
 void create_tcp_server(
     const any_io_executor &executor,
-    const MasterKey &master_key,
+    const PreSharedKey &pre_shared_key,
     proxy::Connector &connector,
     std::optional<SaltFilter> &salt_filter,
     std::optional<TcpServer> &tcp_server) {
@@ -47,12 +52,12 @@ void create_tcp_server(
     options.forward_bytes_rate_limit = flags::tcp_forward_bytes_rate_limit;
     options.backward_bytes_rate_limit = flags::tcp_backward_bytes_rate_limit;
     tcp_server.emplace(
-        executor, flags::endpoint, master_key, connector, options);
+        executor, flags::endpoint, pre_shared_key, connector, options);
 }
 
 void create_udp_server(
     const any_io_executor &executor,
-    const MasterKey &master_key,
+    const PreSharedKey &pre_shared_key,
     proxy::Connector &connector,
     std::optional<SaltFilter> &salt_filter,
     std::optional<UdpServer> &udp_server) {
@@ -66,7 +71,7 @@ void create_udp_server(
     options.backward_packets_rate_limit =
         flags::udp_backward_packets_rate_limit;
     udp_server.emplace(
-        executor, flags::endpoint, master_key, connector, options);
+        executor, flags::endpoint, pre_shared_key, connector, options);
 }
 
 }  // namespace
@@ -81,8 +86,16 @@ int main(int argc, char *argv[]) {
 
     net::io_context io_context;
     auto executor = io_context.get_executor();
-    MasterKey master_key;
-    master_key.init(flags::method, flags::password);
+    const auto *method = Method::find(flags::method);
+    if (!method) {
+        LOG(fatal) << "invalid method: " << method;
+        return 1;
+    }
+    PreSharedKey pre_shared_key;
+    if (!pre_shared_key.init(*method, flags::password)) {
+        LOG(fatal) << "invalid password";
+        return 1;
+    }
     net::proxy::system::Connector connector(executor);
     std::optional<SaltFilter> salt_filter;
     if (flags::detect_salt_reuse) {
@@ -91,12 +104,12 @@ int main(int argc, char *argv[]) {
     std::optional<TcpServer> tcp_server;
     if (flags::enable_tcp) {
         create_tcp_server(
-            executor, master_key, connector, salt_filter, tcp_server);
+            executor, pre_shared_key, connector, salt_filter, tcp_server);
     }
     std::optional<UdpServer> udp_server;
     if (flags::enable_udp) {
         create_udp_server(
-            executor, master_key, connector, salt_filter, udp_server);
+            executor, pre_shared_key, connector, salt_filter, udp_server);
     }
     io_context.run();
 }

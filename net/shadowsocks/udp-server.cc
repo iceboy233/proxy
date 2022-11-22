@@ -51,14 +51,14 @@ private:
 UdpServer::UdpServer(
     const any_io_executor &executor,
     const udp::endpoint &endpoint,
-    const MasterKey &master_key,
+    const proxy::shadowsocks::PreSharedKey &pre_shared_key,
     proxy::Connector &connector,
     const Options &options)
     : executor_(executor),
       salt_filter_(options.salt_filter),
       connection_timeout_(options.connection_timeout),
       socket_(executor, endpoint),
-      encrypted_datagram_(socket_, master_key, salt_filter_),
+      encrypted_datagram_(socket_, pre_shared_key, salt_filter_),
       connector_(connector),
       timer_list_(executor_, connection_timeout_) {
     if (options.forward_packets_rate_limit) {

@@ -30,7 +30,7 @@ public:
     TcpServer(
         const any_io_executor &executor,
         const tcp::endpoint &endpoint,
-        const MasterKey &master_key,
+        const proxy::shadowsocks::PreSharedKey &pre_shared_key,
         proxy::Connector &connector,
         const Options &options);
 
@@ -40,7 +40,7 @@ private:
     void accept();
 
     any_io_executor executor_;
-    const MasterKey &master_key_;
+    const proxy::shadowsocks::PreSharedKey &pre_shared_key_;
     SaltFilter *salt_filter_;
     std::chrono::nanoseconds connection_timeout_;
     tcp::acceptor acceptor_;

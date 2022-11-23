@@ -1,6 +1,45 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
+    name = "connector",
+    srcs = ["connector.cc"],
+    hdrs = ["connector.h"],
+    deps = [
+        ":decryptor",
+        ":encryptor",
+        ":pre-shared-key",
+        "//net/proxy:interface",
+        "@com_google_absl//absl/base",
+        "@org_iceboy_trunk//net:endpoint",
+    ],
+)
+
+cc_library(
+    name = "decryptor",
+    srcs = ["decryptor.cc"],
+    hdrs = ["decryptor.h"],
+    deps = [
+        ":pre-shared-key",
+        ":session-subkey",
+        "@com_google_absl//absl/container:fixed_array",
+        "@org_iceboy_trunk//base:types",
+    ],
+)
+
+cc_library(
+    name = "encryptor",
+    srcs = ["encryptor.cc"],
+    hdrs = ["encryptor.h"],
+    deps = [
+        ":pre-shared-key",
+        ":session-subkey",
+        "@boringssl//:crypto",
+        "@org_boost_boost//:endian",
+        "@org_iceboy_trunk//base:types",
+    ],
+)
+
+cc_library(
     name = "method",
     srcs = ["method.cc"],
     hdrs = ["method.h"],

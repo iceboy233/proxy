@@ -25,8 +25,9 @@ bool Decryptor::start_chunk(size_t size) {
         {&buffer_[buffer_first_], size},
         &buffer_[buffer_first_ + size],
         &buffer_[buffer_first_])) {
-        printf("FIXME: handle decrypt failure\n");
-        // TODO: in this case, someone should discard the remaining bytes
+        buffer_first_ = 0;
+        buffer_last_ = 0;
+        discard_ = true;
         return false;
     }
     return true;
@@ -50,6 +51,13 @@ uint8_t *Decryptor::pop_buffer(size_t size) {
 
 void Decryptor::finish_chunk() {
     buffer_first_ += 16;
+}
+
+void Decryptor::advance(size_t size) {
+    if (discard_) {
+        return;
+    }
+    buffer_last_ += size;
 }
 
 BufferSpan Decryptor::buffer() {

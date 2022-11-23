@@ -23,7 +23,7 @@ public:
     uint16_t pop_big_u16();
     uint8_t *pop_buffer(size_t size);
     void finish_chunk();
-    void advance(size_t size) { buffer_last_ += size; }
+    void advance(size_t size);
 
     BufferSpan buffer();
 
@@ -32,6 +32,7 @@ private:
     absl::FixedArray<uint8_t, 0> buffer_;
     size_t buffer_first_ = 0;
     size_t buffer_last_ = 0;
+    bool discard_ = false;
 };
 
 }  // namespace shadowsocks

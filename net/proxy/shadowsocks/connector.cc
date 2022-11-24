@@ -318,9 +318,7 @@ void Connector::TcpStream::async_write_some(
         encryptor_.start_chunk();
         encryptor_.push_big_u16(buffer.size());
         encryptor_.finish_chunk();
-        encryptor_.start_chunk();
-        encryptor_.push_buffer({buffer.data(), buffer.size()});
-        encryptor_.finish_chunk();
+        encryptor_.write_buffer_chunk({buffer.data(), buffer.size()});
         total_size += buffer.size();
     }
     ConstBufferSpan write_buffer = encryptor_.buffer();

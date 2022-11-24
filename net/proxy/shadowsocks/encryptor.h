@@ -20,6 +20,7 @@ public:
     void push_big_u16(uint16_t value);
     void push_buffer(ConstBufferSpan buffer);
     void finish_chunk();
+    void write_buffer_chunk(ConstBufferSpan buffer);
     void clear() { buffer_.clear(); }
 
     ConstBufferSpan buffer() const { return buffer_; }

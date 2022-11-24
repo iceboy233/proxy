@@ -42,6 +42,13 @@ void Encryptor::finish_chunk() {
         &buffer_[offset]);
 }
 
+void Encryptor::write_buffer_chunk(ConstBufferSpan buffer) {
+    size_t offset = buffer_.size();
+    buffer_.resize(offset + buffer.size() + 16);
+    session_subkey_.encrypt(
+        buffer, &buffer_[offset], &buffer_[offset + buffer.size()]);
+}
+
 }  // namespace shadowsocks
 }  // namespace proxy
 }  // namespace net

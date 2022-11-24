@@ -274,9 +274,8 @@ void Handler::TcpConnection::backward_write() {
     encryptor_.start_chunk();
     encryptor_.push_big_u16(backward_read_size_);
     encryptor_.finish_chunk();
-    encryptor_.start_chunk();
-    encryptor_.push_buffer({backward_read_buffer_.data(), backward_read_size_});
-    encryptor_.finish_chunk();
+    encryptor_.write_buffer_chunk(
+        {backward_read_buffer_.data(), backward_read_size_});
     ConstBufferSpan write_buffer = encryptor_.buffer();
     async_write(
         stream_,

@@ -1,6 +1,7 @@
 #ifndef _NET_PROXY_SHADOWSOCKS_DECRYPTOR_H
 #define _NET_PROXY_SHADOWSOCKS_DECRYPTOR_H
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 

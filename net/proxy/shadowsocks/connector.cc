@@ -158,9 +158,7 @@ void Connector::TcpStream::start(
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
     // TODO: split chunks if too large
-    encryptor_.start_chunk();
-    encryptor_.push_big_u16(7 + initial_data.size());
-    encryptor_.finish_chunk();
+    encryptor_.write_length_chunk(7 + initial_data.size());
     encryptor_.start_chunk();
     encryptor_.push_u8(1);  // ipv4
     encryptor_.push_buffer(address.to_bytes());
@@ -177,9 +175,7 @@ void Connector::TcpStream::start(
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
     // TODO: split chunks if too large
-    encryptor_.start_chunk();
-    encryptor_.push_big_u16(19 + initial_data.size());
-    encryptor_.finish_chunk();
+    encryptor_.write_length_chunk(19 + initial_data.size());
     encryptor_.start_chunk();
     encryptor_.push_u8(4);  // ipv6
     encryptor_.push_buffer(address.to_bytes());
@@ -196,9 +192,7 @@ void Connector::TcpStream::start(
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
     // TODO: split chunks if too large
-    encryptor_.start_chunk();
-    encryptor_.push_big_u16(2 + host.size() + 2 + initial_data.size());
-    encryptor_.finish_chunk();
+    encryptor_.write_length_chunk(2 + host.size() + 2 + initial_data.size());
     encryptor_.start_chunk();
     encryptor_.push_u8(3);  // host
     encryptor_.push_u8(host.size());
@@ -315,10 +309,8 @@ void Connector::TcpStream::async_write_some(
     encryptor_.clear();
     for (const_buffer buffer : buffers) {
         // TODO: split chunks if too large
-        encryptor_.start_chunk();
-        encryptor_.push_big_u16(buffer.size());
-        encryptor_.finish_chunk();
-        encryptor_.write_buffer_chunk({buffer.data(), buffer.size()});
+        encryptor_.write_length_chunk(buffer.size());
+        encryptor_.write_payload_chunk({buffer.data(), buffer.size()});
         total_size += buffer.size();
     }
     ConstBufferSpan write_buffer = encryptor_.buffer();

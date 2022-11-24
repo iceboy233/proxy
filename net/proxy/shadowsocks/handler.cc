@@ -1,5 +1,6 @@
 #include "net/proxy/shadowsocks/handler.h"
 
+#include <algorithm>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
@@ -79,8 +80,7 @@ Handler::TcpConnection::TcpConnection(
     : handler_(handler),
       stream_(stream),
       callback_(std::move(callback)),
-      backward_read_buffer_(
-          handler_.pre_shared_key_.method().max_chunk_size()) {}
+      backward_read_buffer_(65536) {}
 
 Handler::TcpConnection::~TcpConnection() {
     std::move(callback_)({});
@@ -214,7 +214,10 @@ void Handler::TcpConnection::forward_parse_ipv6(size_t header_length) {
 }
 
 void Handler::TcpConnection::forward_parse_host(size_t header_length) {
-    uint8_t host_length = decryptor_.pop_u8();
+    size_t host_length = decryptor_.pop_u8();
+    if (2 + host_length + 2 > header_length) {
+        return;
+    }
     std::string_view host(
         reinterpret_cast<char *>(decryptor_.pop_buffer(host_length)),
         host_length);
@@ -270,12 +273,16 @@ void Handler::TcpConnection::backward_read() {
 }
 
 void Handler::TcpConnection::backward_write() {
-    // TODO: decouple chunk size and read buffer size.
-    encryptor_.start_chunk();
-    encryptor_.push_big_u16(backward_read_size_);
-    encryptor_.finish_chunk();
-    encryptor_.write_buffer_chunk(
-        {backward_read_buffer_.data(), backward_read_size_});
+    ConstBufferSpan read_buffer(
+        backward_read_buffer_.data(), backward_read_size_);
+    do {
+        size_t chunk_size = std::min(
+            read_buffer.size(),
+            handler_.pre_shared_key_.method().max_chunk_size());
+        encryptor_.write_length_chunk(chunk_size);
+        encryptor_.write_payload_chunk(read_buffer.subspan(0, chunk_size));
+        read_buffer.remove_prefix(chunk_size);
+    } while (!read_buffer.empty());
     ConstBufferSpan write_buffer = encryptor_.buffer();
     async_write(
         stream_,

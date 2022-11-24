@@ -25,6 +25,8 @@ void Listener::accept() {
                 LOG(fatal) << "accept failed: " << ec;
                 return;
             }
+            // TODO(iceboy): Make this an option.
+            stream->socket().set_option(tcp::no_delay(true));
             Stream &stream_ref = *stream;
             handler_.handle_stream(
                 stream_ref,

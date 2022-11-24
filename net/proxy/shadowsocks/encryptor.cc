@@ -1,6 +1,7 @@
 #include "net/proxy/shadowsocks/encryptor.h"
 
 #include <openssl/rand.h>
+#include <boost/endian/arithmetic.hpp>
 #include <boost/endian/conversion.hpp>
 
 namespace net {
@@ -42,11 +43,19 @@ void Encryptor::finish_chunk() {
         &buffer_[offset]);
 }
 
-void Encryptor::write_buffer_chunk(ConstBufferSpan buffer) {
+void Encryptor::write_length_chunk(uint16_t length) {
     size_t offset = buffer_.size();
-    buffer_.resize(offset + buffer.size() + 16);
+    buffer_.resize(offset + 18);
+    boost::endian::big_uint16_at length_big = length;
     session_subkey_.encrypt(
-        buffer, &buffer_[offset], &buffer_[offset + buffer.size()]);
+        {length_big.data(), 2}, &buffer_[offset], &buffer_[offset + 2]);
+}
+
+void Encryptor::write_payload_chunk(ConstBufferSpan payload) {
+    size_t offset = buffer_.size();
+    buffer_.resize(offset + payload.size() + 16);
+    session_subkey_.encrypt(
+        payload, &buffer_[offset], &buffer_[offset + payload.size()]);
 }
 
 }  // namespace shadowsocks

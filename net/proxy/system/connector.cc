@@ -3,69 +3,11 @@
 #include <array>
 #include <utility>
 
-#include "absl/container/fixed_array.h"
 #include "absl/strings/str_cat.h"
-#include "net/proxy/stream.h"
 
 namespace net {
 namespace proxy {
 namespace system {
-
-class Connector::TcpSocketStream : public Stream {
-public:
-    explicit TcpSocketStream(const any_io_executor &executor)
-        : socket_(executor) {}
-
-    TcpSocketStream(const TcpSocketStream &) = delete;
-    TcpSocketStream &operator=(const TcpSocketStream &) = delete;
-
-    any_io_executor get_executor() override {
-        return socket_.get_executor();
-    }
-
-    void async_read_some(
-        absl::Span<mutable_buffer const> buffers,
-        absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
-
-    void async_write_some(
-        absl::Span<const_buffer const> buffers,
-        absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
-
-    tcp::socket &socket() { return socket_; }
-    const tcp::socket &socket() const { return socket_; }
-
-private:
-    tcp::socket socket_;
-};
-
-class Connector::UdpSocketDatagram : public Datagram {
-public:
-    explicit UdpSocketDatagram(const any_io_executor &executor)
-        : socket_(executor) {}
-
-    UdpSocketDatagram(const UdpSocketDatagram &) = delete;
-    UdpSocketDatagram &operator=(const UdpSocketDatagram &) = delete;
-
-    void async_receive_from(
-        absl::Span<mutable_buffer const> buffers,
-        udp::endpoint &endpoint,
-        absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
-
-    void async_send_to(
-        absl::Span<const_buffer const> buffers,
-        const udp::endpoint &endpoint,
-        absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
-
-    any_io_executor get_executor() override {
-        return socket_.get_executor();
-    }
-
-    udp::socket &socket() { return socket_; }
-    const udp::socket &socket() const { return socket_; }
-
-private:
-    udp::socket socket_;
-};
 
 Connector::Connector(const any_io_executor &executor)
     : executor_(executor),
@@ -183,42 +125,6 @@ void Connector::send_initial_data(
         }
         std::move(callback)({}, std::move(stream));
     });
-}
-
-void Connector::TcpSocketStream::async_read_some(
-    absl::Span<mutable_buffer const> buffers,
-    absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
-    socket_.async_read_some(
-        absl::FixedArray<mutable_buffer, 1>(buffers.begin(), buffers.end()),
-        std::move(callback));
-}
-
-void Connector::TcpSocketStream::async_write_some(
-    absl::Span<const_buffer const> buffers,
-    absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
-    socket_.async_write_some(
-        absl::FixedArray<const_buffer, 1>(buffers.begin(), buffers.end()),
-        std::move(callback));
-}
-
-void Connector::UdpSocketDatagram::async_receive_from(
-    absl::Span<mutable_buffer const> buffers,
-    udp::endpoint &endpoint,
-    absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
-    socket_.async_receive_from(
-        absl::FixedArray<mutable_buffer, 1>(buffers.begin(), buffers.end()),
-        endpoint,
-        std::move(callback));
-}
-
-void Connector::UdpSocketDatagram::async_send_to(
-    absl::Span<const_buffer const> buffers,
-    const udp::endpoint &endpoint,
-    absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
-    socket_.async_send_to(
-        absl::FixedArray<const_buffer, 1>(buffers.begin(), buffers.end()),
-        endpoint,
-        std::move(callback));
 }
 
 }  // namespace system

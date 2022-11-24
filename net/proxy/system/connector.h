@@ -2,6 +2,8 @@
 #define _NET_PROXY_SYSTEM_CONNECTOR_H
 
 #include "net/proxy/connector.h"
+#include "net/proxy/system/tcp-socket-stream.h"
+#include "net/proxy/system/udp-socket-datagram.h"
 
 namespace net {
 namespace proxy {
@@ -39,9 +41,6 @@ public:
     std::error_code bind_udp_v6(std::unique_ptr<Datagram> &datagram) override;
 
 private:
-    class TcpSocketStream;
-    class UdpSocketDatagram;
-
     template <typename EndpointsT>
     void connect_tcp(
         const EndpointsT &endpoints,

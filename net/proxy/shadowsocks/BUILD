@@ -40,6 +40,21 @@ cc_library(
 )
 
 cc_library(
+    name = "handler",
+    srcs = ["handler.cc"],
+    hdrs = ["handler.h"],
+    deps = [
+        ":decryptor",
+        ":encryptor",
+        ":pre-shared-key",
+        ":session-subkey",
+        "//net/proxy:interface",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/container:fixed_array",
+    ],
+)
+
+cc_library(
     name = "method",
     srcs = ["method.cc"],
     hdrs = ["method.h"],

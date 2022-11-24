@@ -9,9 +9,9 @@ namespace net {
 namespace proxy {
 namespace shadowsocks {
 
-class Connector::TcpSocketStream : public proxy::Stream {
+class Connector::TcpStream : public proxy::Stream {
 public:
-    explicit TcpSocketStream(Connector &connector);
+    explicit TcpStream(Connector &connector);
 
     void start(
         const net::address_v4 &address,
@@ -81,7 +81,7 @@ void Connector::connect_tcp_v4(
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    auto stream = std::make_unique<TcpSocketStream>(*this);
+    auto stream = std::make_unique<TcpStream>(*this);
     stream->start(
         address,
         port,
@@ -102,7 +102,7 @@ void Connector::connect_tcp_v6(
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    auto stream = std::make_unique<TcpSocketStream>(*this);
+    auto stream = std::make_unique<TcpStream>(*this);
     stream->start(
         address,
         port,
@@ -123,7 +123,7 @@ void Connector::connect_tcp_host(
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    auto stream = std::make_unique<TcpSocketStream>(*this);
+    auto stream = std::make_unique<TcpStream>(*this);
     stream->start(
         host,
         port,
@@ -148,15 +148,16 @@ std::error_code Connector::bind_udp_v6(std::unique_ptr<Datagram> &datagram) {
     return make_error_code(std::errc::operation_not_supported);
 }
 
-Connector::TcpSocketStream::TcpSocketStream(Connector &connector)
+Connector::TcpStream::TcpStream(Connector &connector)
     : connector_(connector) {}
 
-void Connector::TcpSocketStream::start(
+void Connector::TcpStream::start(
     const net::address_v4 &address,
     uint16_t port,
     const_buffer initial_data,
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
+    // TODO: split chunks if too large
     encryptor_.start_chunk();
     encryptor_.push_big_u16(7 + initial_data.size());
     encryptor_.finish_chunk();
@@ -169,12 +170,13 @@ void Connector::TcpSocketStream::start(
     connect(std::move(callback));
 }
 
-void Connector::TcpSocketStream::start(
+void Connector::TcpStream::start(
     const net::address_v6 &address,
     uint16_t port,
     const_buffer initial_data,
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
+    // TODO: split chunks if too large
     encryptor_.start_chunk();
     encryptor_.push_big_u16(19 + initial_data.size());
     encryptor_.finish_chunk();
@@ -187,12 +189,13 @@ void Connector::TcpSocketStream::start(
     connect(std::move(callback));
 }
 
-void Connector::TcpSocketStream::start(
+void Connector::TcpStream::start(
     std::string_view host,
     uint16_t port,
     const_buffer initial_data,
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
+    // TODO: split chunks if too large
     encryptor_.start_chunk();
     encryptor_.push_big_u16(2 + host.size() + 2 + initial_data.size());
     encryptor_.finish_chunk();
@@ -206,8 +209,9 @@ void Connector::TcpSocketStream::start(
     connect(std::move(callback));
 }
 
-void Connector::TcpSocketStream::connect(
+void Connector::TcpStream::connect(
     absl::AnyInvocable<void(std::error_code) &&> callback) {
+    ConstBufferSpan write_buffer = encryptor_.buffer();
     auto wrapped_callback = [this, callback = std::move(callback)](
         std::error_code ec, std::unique_ptr<Stream> stream) mutable {
         if (ec) {
@@ -221,18 +225,18 @@ void Connector::TcpSocketStream::connect(
         connector_.base_connector_.connect_tcp_v4(
             connector_.endpoint_.address().to_v4(),
             connector_.endpoint_.port(),
-            buffer(encryptor_.buffer().data(), encryptor_.buffer().size()),
+            buffer(write_buffer.data(), write_buffer.size()),
             std::move(wrapped_callback));
     } else {
         connector_.base_connector_.connect_tcp_v6(
             connector_.endpoint_.address().to_v6(),
             connector_.endpoint_.port(),
-            buffer(encryptor_.buffer().data(), encryptor_.buffer().size()),
+            buffer(write_buffer.data(), write_buffer.size()),
             std::move(wrapped_callback));
     }
 }
 
-void Connector::TcpSocketStream::async_read_some(
+void Connector::TcpStream::async_read_some(
     absl::Span<mutable_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
     while (true) {
@@ -280,18 +284,18 @@ void Connector::TcpSocketStream::async_read_some(
                 }
             }
             std::move(callback)({}, total_size);
-            break;
         }
     }
 }
 
-void Connector::TcpSocketStream::read(
+void Connector::TcpStream::read(
     absl::Span<mutable_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
     absl::FixedArray<mutable_buffer, 1> buffers_copy(
         buffers.begin(), buffers.end());
+    BufferSpan read_buffer = decryptor_.buffer();
     base_stream_->async_read_some(
-        mutable_buffer(decryptor_.buffer().data(), decryptor_.buffer().size()),
+        buffer(read_buffer.data(), read_buffer.size()),
         [this, buffers = std::move(buffers_copy),
             callback = std::move(callback)](
             std::error_code ec, size_t size) mutable {
@@ -304,12 +308,13 @@ void Connector::TcpSocketStream::read(
         });
 }
 
-void Connector::TcpSocketStream::async_write_some(
+void Connector::TcpStream::async_write_some(
     absl::Span<const_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
     size_t total_size = 0;
     encryptor_.clear();
     for (const_buffer buffer : buffers) {
+        // TODO: split chunks if too large
         encryptor_.start_chunk();
         encryptor_.push_big_u16(buffer.size());
         encryptor_.finish_chunk();
@@ -318,9 +323,10 @@ void Connector::TcpSocketStream::async_write_some(
         encryptor_.finish_chunk();
         total_size += buffer.size();
     }
+    ConstBufferSpan write_buffer = encryptor_.buffer();
     async_write(
         *base_stream_,
-        buffer(encryptor_.buffer().data(), encryptor_.buffer().size()),
+        buffer(write_buffer.data(), write_buffer.size()),
         [total_size, callback = std::move(callback)](
             std::error_code ec, size_t) mutable {
             if (ec) {
@@ -331,7 +337,7 @@ void Connector::TcpSocketStream::async_write_some(
         });
 }
 
-any_io_executor Connector::TcpSocketStream::get_executor() {
+any_io_executor Connector::TcpStream::get_executor() {
     return connector_.executor_;
 }
 

@@ -21,6 +21,7 @@ public:
     size_t key_size() const { return EVP_AEAD_key_length(aead_); }
     size_t salt_size() const { return EVP_AEAD_key_length(aead_); }
     size_t nonce_size() const { return EVP_AEAD_nonce_length(aead_); }
+    size_t max_chunk_size() const { return 16383; }
 
 private:
     explicit Method(const EVP_AEAD *aead);

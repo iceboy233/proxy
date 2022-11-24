@@ -5,6 +5,7 @@ cc_library(
     hdrs = [
         "connector.h",
         "datagram.h",
+        "handler.h",
         "stream.h",
     ],
     deps = [

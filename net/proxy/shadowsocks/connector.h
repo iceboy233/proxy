@@ -52,8 +52,7 @@ public:
     std::error_code bind_udp_v6(std::unique_ptr<Datagram> &datagram) override;
 
 private:
-    class TcpSocketStream;
-    class UdpSocketDatagram;
+    class TcpStream;
 
     any_io_executor executor_;
     proxy::Connector &base_connector_;

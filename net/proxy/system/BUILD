@@ -5,9 +5,45 @@ cc_library(
     srcs = ["connector.cc"],
     hdrs = ["connector.h"],
     deps = [
+        ":tcp-socket-stream",
+        ":udp-socket-datagram",
+        "//net/proxy:interface",
+        "@com_google_absl//absl/strings",
+        "@org_iceboy_trunk//net:asio",
+    ],
+)
+
+cc_library(
+    name = "listener",
+    srcs = ["listener.cc"],
+    hdrs = ["listener.h"],
+    deps = [
+        ":tcp-socket-stream",
+        "//net/proxy:interface",
+        "@org_iceboy_trunk//base:logging",
+        "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:endpoint",
+    ],
+)
+
+cc_library(
+    name = "tcp-socket-stream",
+    srcs = ["tcp-socket-stream.cc"],
+    hdrs = ["tcp-socket-stream.h"],
+    deps = [
         "//net/proxy:interface",
         "@com_google_absl//absl/container:fixed_array",
-        "@com_google_absl//absl/strings",
+        "@org_iceboy_trunk//net:asio",
+    ],
+)
+
+cc_library(
+    name = "udp-socket-datagram",
+    srcs = ["udp-socket-datagram.cc"],
+    hdrs = ["udp-socket-datagram.h"],
+    deps = [
+        "//net/proxy:interface",
+        "@com_google_absl//absl/container:fixed_array",
         "@org_iceboy_trunk//net:asio",
     ],
 )

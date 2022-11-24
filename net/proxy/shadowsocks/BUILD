@@ -1,6 +1,18 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    deps = [
+        ":handler",
+        "//net/proxy:registry",
+        "@org_iceboy_trunk//base:logging",
+        "@org_boost_boost//:property_tree",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
     name = "connector",
     srcs = ["connector.cc"],
     hdrs = ["connector.h"],

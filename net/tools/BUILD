@@ -26,6 +26,20 @@ cc_binary(
 )
 
 cc_binary(
+    name = "miracle-proxy",
+    srcs = ["miracle-proxy.cc"],
+    deps = [
+        "//net/proxy",
+        "//net/proxy/shadowsocks:config",
+        "//net/proxy/system:config",
+        "@org_boost_boost//:property_tree",
+        "@org_iceboy_trunk//base:flags",
+        "@org_iceboy_trunk//base:logging",
+        "@org_iceboy_trunk//net:asio",
+    ],
+)
+
+cc_binary(
     name = "rpc-benchmark",
     srcs = ["rpc-benchmark.cc"],
     deps = [

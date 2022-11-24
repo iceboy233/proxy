@@ -44,7 +44,7 @@ http_archive(
 
 git_repository(
     name = "org_boost_boost",
-    commit = "60a48497f5f9453049e8a35b8f0c799d2673e9e5",
+    commit = "5d277ca0e165c4de02104bb976233cd6c6b7c75f",
     remote = "https://github.com/iceboy233/boost.git",
 )
 

@@ -14,6 +14,11 @@ void Proxy::load_config(const boost::property_tree::ptree &config) {
     auto listeners_config = config.get_child("listeners", {});
     auto handlers_config = config.get_child("handlers", {});
     auto connectors_config = config.get_child("connectors", {});
+    if (connectors_config.find("") == connectors_config.not_found()) {
+        boost::property_tree::ptree default_connector;
+        default_connector.put("type", "system");
+        connectors_config.add_child("", default_connector);
+    }
     for (const auto &pair : listeners_config) {
         const auto &listener_config = pair.second;
         std::string endpoint_str = listener_config.get<std::string>(
@@ -44,7 +49,11 @@ Handler *Proxy::get_handler(
     if (iter != handlers_.end()) {
         return &*iter->second;
     }
-    auto handler_config = handlers_config.get_child(std::string(name), {});
+    auto config_iter = handlers_config.find(std::string(name));
+    if (config_iter == handlers_config.not_found()) {
+        return nullptr;
+    }
+    const auto &handler_config = config_iter->second;
     auto handler = Registry::instance().create_handler(
         handler_config.get<std::string>("type", ""),
         executor_,
@@ -64,7 +73,11 @@ Connector *Proxy::get_connector(
     if (iter != connectors_.end()) {
         return &*iter->second;
     }
-    auto connector_config = connectors_config.get_child(std::string(name), {});
+    auto config_iter = connectors_config.find(std::string(name));
+    if (config_iter == connectors_config.not_found()) {
+        return nullptr;
+    }
+    const auto &connector_config = config_iter->second;
     auto connector = Registry::instance().create_connector(
         connector_config.get<std::string>("type", ""),
         executor_,

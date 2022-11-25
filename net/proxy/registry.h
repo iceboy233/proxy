@@ -37,6 +37,7 @@ public:
 
     using ConnectorCreateFunc = absl::AnyInvocable<std::unique_ptr<Connector>(
         const any_io_executor &executor,
+        absl::AnyInvocable<Connector *(std::string_view)> get_connector_func,
         const boost::property_tree::ptree &settings)>;
 
     void register_connector_type(
@@ -46,6 +47,7 @@ public:
     std::unique_ptr<Connector> create_connector(
         std::string_view type,
         const any_io_executor &executor,
+        absl::AnyInvocable<Connector *(std::string_view)> get_connector_func,
         const boost::property_tree::ptree &settings);
 
 private:
@@ -62,7 +64,7 @@ private:
     namespace { \
     auto register_handler_type##_create_func = []() { \
         net::proxy::Registry::instance().register_handler_type( \
-            _type, _create_func); \
+            #_type, _create_func); \
         return 0; \
     }(); \
     } \
@@ -71,7 +73,7 @@ private:
     namespace { \
     auto register_connector_type##_create_func = []() { \
         net::proxy::Registry::instance().register_connector_type( \
-            _type, _create_func); \
+            #_type, _create_func); \
         return 0; \
     }(); \
     } \

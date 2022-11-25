@@ -31,6 +31,7 @@ cc_binary(
     deps = [
         "//net/proxy",
         "//net/proxy/shadowsocks:config",
+        "//net/proxy/socks:config",
         "//net/proxy/system:config",
         "@org_boost_boost//:property_tree",
         "@org_iceboy_trunk//base:flags",

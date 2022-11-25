@@ -4,10 +4,13 @@ cc_library(
     name = "config",
     srcs = ["config.cc"],
     deps = [
+        ":connector",
         ":handler",
         "//net/proxy:registry",
-        "@org_iceboy_trunk//base:logging",
+        "@com_google_absl//absl/functional:any_invocable",
         "@org_boost_boost//:property_tree",
+        "@org_iceboy_trunk//base:logging",
+        "@org_iceboy_trunk//net:asio",
     ],
     alwayslink = 1,
 )

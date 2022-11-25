@@ -30,7 +30,6 @@ private:
     void forward_parse_ipv4(size_t header_length);
     void forward_parse_ipv6(size_t header_length);
     void forward_parse_host(size_t header_length);
-    void forward_read_tail();
     void forward_write();
     void backward_read();
     void backward_write();
@@ -58,7 +57,7 @@ private:
 
 Handler::Handler(
     const any_io_executor &executor,
-    Connector &connector)
+    proxy::Connector &connector)
     : connector_(connector) {}
 
 bool Handler::init(const Config &config) {
@@ -80,7 +79,8 @@ Handler::TcpConnection::TcpConnection(
     : handler_(handler),
       stream_(stream),
       callback_(std::move(callback)),
-      backward_read_buffer_(65536) {}
+      // TODO: find out how to use larger buffer
+      backward_read_buffer_(4096) {}
 
 Handler::TcpConnection::~TcpConnection() {
     std::move(callback_)({});

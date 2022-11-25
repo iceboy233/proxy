@@ -49,12 +49,13 @@ void Registry::register_connector_type(
 std::unique_ptr<Connector> Registry::create_connector(
     std::string_view type,
     const any_io_executor &executor,
+    absl::AnyInvocable<Connector *(std::string_view)> get_connector_func,
     const boost::property_tree::ptree &settings) {
     auto iter = connector_types_.find(type);
     if (iter == connector_types_.end()) {
         return nullptr;
     }
-    return iter->second(executor, settings);
+    return iter->second(executor, std::move(get_connector_func), settings);
 }
 
 }  // namespace proxy

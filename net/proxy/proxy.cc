@@ -1,5 +1,8 @@
 #include "net/proxy/proxy.h"
 
+#include <functional>
+
+#include "absl/functional/bind_front.h"
 #include "base/logging.h"
 #include "net/endpoint.h"
 #include "net/proxy/registry.h"
@@ -57,9 +60,8 @@ Handler *Proxy::get_handler(
     auto handler = Registry::instance().create_handler(
         handler_config.get<std::string>("type", ""),
         executor_,
-        [this, &connectors_config](std::string_view connector_name) {
-            return get_connector(connectors_config, connector_name);
-        },
+        absl::bind_front(
+            &Proxy::get_connector, this, std::ref(connectors_config)),
         handler_config.get_child("settings", {}));
     Handler *handler_ptr = handler.get();
     handlers_[name] = std::move(handler);
@@ -81,6 +83,8 @@ Connector *Proxy::get_connector(
     auto connector = Registry::instance().create_connector(
         connector_config.get<std::string>("type", ""),
         executor_,
+        absl::bind_front(
+            &Proxy::get_connector, this, std::ref(connectors_config)),
         connector_config.get_child("settings", {}));
     Connector *connector_ptr = connector.get();
     connectors_[name] = std::move(connector);

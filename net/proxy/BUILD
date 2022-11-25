@@ -24,6 +24,7 @@ cc_library(
         ":registry",
         "//net/proxy/system:listener",
         "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/functional:bind_front",
         "@org_boost_boost//:property_tree",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:asio",

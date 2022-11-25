@@ -14,7 +14,7 @@ class Handler : public proxy::Handler {
 public:
     Handler(
         const any_io_executor &executor,
-        Connector &connector);
+        proxy::Connector &connector);
 
     struct Config {
         const Method *method = &Method::aes_128_gcm();
@@ -30,7 +30,7 @@ public:
 private:
     class TcpConnection;
 
-    Connector &connector_;
+    proxy::Connector &connector_;
     PreSharedKey pre_shared_key_;
 };
 

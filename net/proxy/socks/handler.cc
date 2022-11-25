@@ -15,11 +15,7 @@ namespace socks {
 class Handler::TcpConnection : public boost::intrusive_ref_counter<
     TcpConnection, boost::thread_unsafe_counter> {
 public:
-    TcpConnection(
-        Handler &handler,
-        Stream &stream,
-        absl::AnyInvocable<void(std::error_code) &&> callback);
-    ~TcpConnection();
+    TcpConnection(Handler &handler, std::unique_ptr<Stream> stream);
 
     void start() { forward_read(); }
 
@@ -42,10 +38,10 @@ private:
     void backward_write();
     void backward_dispatch();
     void backward_read();
+    void close();
 
     Handler &handler_;
-    Stream &stream_;
-    absl::AnyInvocable<void(std::error_code) &&> callback_;
+    std::unique_ptr<Stream> stream_;
     std::unique_ptr<Stream> remote_stream_;
     State state_ = State::method_selection;
     absl::FixedArray<uint8_t, 0> forward_buffer_;
@@ -57,37 +53,33 @@ private:
 Handler::Handler(const any_io_executor &executor, proxy::Connector &connector)
     : connector_(connector) {}
 
-void Handler::handle_stream(
-    Stream &stream,
-    absl::AnyInvocable<void(std::error_code) &&> callback) {
+void Handler::handle_stream(std::unique_ptr<Stream> stream) {
     boost::intrusive_ptr<TcpConnection> connection(new TcpConnection(
-        *this, stream, std::move(callback)));
+        *this, std::move(stream)));
     connection->start();
 }
 
 Handler::TcpConnection::TcpConnection(
     Handler &handler,
-    Stream &stream,
-    absl::AnyInvocable<void(std::error_code) &&> callback)
+    std::unique_ptr<Stream> stream)
     : handler_(handler),
-      stream_(stream),
-      callback_(std::move(callback)),
+      stream_(std::move(stream)),
       // TODO: find out how to use larger buffers
       forward_buffer_(4096),
       backward_buffer_(4096) {}
 
-Handler::TcpConnection::~TcpConnection() {
-    std::move(callback_)({});
-}
-
 void Handler::TcpConnection::forward_read() {
-    stream_.async_read_some(
+    if (!stream_) {
+        return;
+    }
+    stream_->async_read_some(
         buffer(
             &forward_buffer_[forward_size_],
             forward_buffer_.size() - forward_size_),
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, size_t size) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->forward_size_ += size;
@@ -181,6 +173,7 @@ void Handler::TcpConnection::connect_ipv4(ConstBufferSpan buffer) {
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->remote_stream_ = std::move(stream);
@@ -206,6 +199,7 @@ void Handler::TcpConnection::connect_ipv6(ConstBufferSpan buffer) {
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->remote_stream_ = std::move(stream);
@@ -235,6 +229,7 @@ void Handler::TcpConnection::connect_host(ConstBufferSpan buffer) {
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->remote_stream_ = std::move(stream);
@@ -244,12 +239,16 @@ void Handler::TcpConnection::connect_host(ConstBufferSpan buffer) {
 }
 
 void Handler::TcpConnection::forward_write() {
+    if (!remote_stream_) {
+        return;
+    }
     async_write(
         *remote_stream_,
         buffer(forward_buffer_.data(), forward_size_),
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, size_t) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->forward_size_ = 0;
@@ -273,12 +272,16 @@ void Handler::TcpConnection::reply() {
 }
 
 void Handler::TcpConnection::backward_write() {
+    if (!stream_) {
+        return;
+    }
     async_write(
-        stream_,
+        *stream_,
         buffer(backward_buffer_.data(), backward_size_),
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, size_t) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->backward_size_ = 0;
@@ -299,6 +302,9 @@ void Handler::TcpConnection::backward_dispatch() {
 }
 
 void Handler::TcpConnection::backward_read() {
+    if (!remote_stream_) {
+        return;
+    }
     remote_stream_->async_read_some(
         buffer(
             &backward_buffer_[backward_size_],
@@ -306,11 +312,17 @@ void Handler::TcpConnection::backward_read() {
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, size_t size) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->backward_size_ += size;
             connection->backward_write();
         });
+}
+
+void Handler::TcpConnection::close() {
+    remote_stream_.reset();
+    stream_.reset();
 }
 
 }  // namespace socks

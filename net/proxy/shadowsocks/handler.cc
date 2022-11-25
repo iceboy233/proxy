@@ -16,11 +16,7 @@ namespace shadowsocks {
 class Handler::TcpConnection : public boost::intrusive_ref_counter<
     TcpConnection, boost::thread_unsafe_counter> {
 public:
-    TcpConnection(
-        Handler &handler,
-        Stream &stream,
-        absl::AnyInvocable<void(std::error_code) &&> callback);
-    ~TcpConnection();
+    TcpConnection(Handler &handler, std::unique_ptr<Stream> stream);
 
     void start() { forward_read(); }
 
@@ -33,6 +29,7 @@ private:
     void forward_write();
     void backward_read();
     void backward_write();
+    void close();
 
     enum class ReadState {
         init,
@@ -43,8 +40,7 @@ private:
     };
 
     Handler &handler_;
-    Stream &stream_;
-    absl::AnyInvocable<void(std::error_code) &&> callback_;
+    std::unique_ptr<Stream> stream_;
     std::unique_ptr<Stream> remote_stream_;
     Encryptor encryptor_;
     Decryptor decryptor_;
@@ -64,35 +60,31 @@ bool Handler::init(const Config &config) {
     return pre_shared_key_.init(*config.method, config.password);
 }
 
-void Handler::handle_stream(
-    Stream &stream,
-    absl::AnyInvocable<void(std::error_code) &&> callback) {
+void Handler::handle_stream(std::unique_ptr<Stream> stream) {
     boost::intrusive_ptr<TcpConnection> connection(new TcpConnection(
-        *this, stream, std::move(callback)));
+        *this, std::move(stream)));
     connection->start();
 }
 
 Handler::TcpConnection::TcpConnection(
     Handler &handler,
-    Stream &stream,
-    absl::AnyInvocable<void(std::error_code) &&> callback)
+    std::unique_ptr<Stream> stream)
     : handler_(handler),
-      stream_(stream),
-      callback_(std::move(callback)),
+      stream_(std::move(stream)),
       // TODO: find out how to use larger buffer
       backward_read_buffer_(4096) {}
 
-Handler::TcpConnection::~TcpConnection() {
-    std::move(callback_)({});
-}
-
 void Handler::TcpConnection::forward_read() {
+    if (!stream_) {
+        return;
+    }
     BufferSpan read_buffer = decryptor_.buffer();
-    stream_.async_read_some(
+    stream_->async_read_some(
         buffer(read_buffer.data(), read_buffer.size()),
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, size_t size) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->decryptor_.advance(size);
@@ -173,6 +165,7 @@ void Handler::TcpConnection::forward_parse_ipv4(size_t header_length) {
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->decryptor_.finish_chunk();
@@ -202,6 +195,7 @@ void Handler::TcpConnection::forward_parse_ipv6(size_t header_length) {
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->decryptor_.finish_chunk();
@@ -233,6 +227,7 @@ void Handler::TcpConnection::forward_parse_host(size_t header_length) {
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->decryptor_.finish_chunk();
@@ -245,12 +240,16 @@ void Handler::TcpConnection::forward_parse_host(size_t header_length) {
 }
 
 void Handler::TcpConnection::forward_write() {
+    if (!remote_stream_) {
+        return;
+    }
     async_write(
         *remote_stream_,
         buffer(decryptor_.pop_buffer(read_length_), read_length_),
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, size_t) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->decryptor_.finish_chunk();
@@ -260,11 +259,15 @@ void Handler::TcpConnection::forward_write() {
 }
 
 void Handler::TcpConnection::backward_read() {
+    if (!remote_stream_) {
+        return;
+    }
     remote_stream_->async_read_some(
         buffer(backward_read_buffer_.data(), backward_read_buffer_.size()),
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, size_t size) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->backward_read_size_ = size;
@@ -273,6 +276,9 @@ void Handler::TcpConnection::backward_read() {
 }
 
 void Handler::TcpConnection::backward_write() {
+    if (!stream_) {
+        return;
+    }
     ConstBufferSpan read_buffer(
         backward_read_buffer_.data(), backward_read_size_);
     do {
@@ -285,16 +291,22 @@ void Handler::TcpConnection::backward_write() {
     } while (!read_buffer.empty());
     ConstBufferSpan write_buffer = encryptor_.buffer();
     async_write(
-        stream_,
+        *stream_,
         buffer(write_buffer.data(), write_buffer.size()),
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, size_t) {
             if (ec) {
+                connection->close();
                 return;
             }
             connection->encryptor_.clear();
             connection->backward_read();
         });
+}
+
+void Handler::TcpConnection::close() {
+    remote_stream_.reset();
+    stream_.reset();
 }
 
 }  // namespace shadowsocks

@@ -3,7 +3,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <vector>
 
 #include "absl/container/fixed_array.h"
 #include "base/types.h"

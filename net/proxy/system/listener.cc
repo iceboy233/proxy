@@ -27,10 +27,7 @@ void Listener::accept() {
             }
             // TODO(iceboy): Make this an option.
             stream->socket().set_option(tcp::no_delay(true));
-            Stream &stream_ref = *stream;
-            handler_.handle_stream(
-                stream_ref,
-                [stream = std::move(stream)](std::error_code) {});
+            handler_.handle_stream(std::move(stream));
             accept();
         });
 }

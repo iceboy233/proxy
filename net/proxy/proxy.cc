@@ -15,7 +15,6 @@ Proxy::Proxy(const any_io_executor &executor)
 
 void Proxy::load_config(const boost::property_tree::ptree &config) {
     auto listeners_config = config.get_child("listeners", {});
-    auto handlers_config = config.get_child("handlers", {});
     auto connectors_config = config.get_child("connectors", {});
     if (connectors_config.find("") == connectors_config.not_found()) {
         boost::property_tree::ptree default_connector;
@@ -31,41 +30,21 @@ void Proxy::load_config(const boost::property_tree::ptree &config) {
             LOG(error) << "invalid endpoint: " << endpoint_str;
             continue;
         }
-        std::string handler_str = listener_config.get<std::string>(
-            "handler", "");
-        Handler *handler = get_handler(
-            handlers_config, connectors_config, handler_str);
+        auto handler = Registry::instance().create_handler(
+            listener_config.get<std::string>("type", ""),
+            executor_,
+            absl::bind_front(
+                &Proxy::get_connector, this, std::ref(connectors_config)),
+            listener_config);
         if (!handler) {
-            LOG(error) << "invalid handler: " << handler_str;
+            LOG(error) << "failed to create handler";
             continue;
         }
+        auto &handler_ref = *handler;
+        handlers_.push_back(std::move(handler));
         listeners_.push_back(std::make_unique<system::Listener>(
-            executor_, *endpoint, *handler));
+            executor_, *endpoint, handler_ref));
     }
-}
-
-Handler *Proxy::get_handler(
-    const boost::property_tree::ptree &handlers_config,
-    const boost::property_tree::ptree &connectors_config,
-    std::string_view name) {
-    auto iter = handlers_.find(name);
-    if (iter != handlers_.end()) {
-        return &*iter->second;
-    }
-    auto config_iter = handlers_config.find(std::string(name));
-    if (config_iter == handlers_config.not_found()) {
-        return nullptr;
-    }
-    const auto &handler_config = config_iter->second;
-    auto handler = Registry::instance().create_handler(
-        handler_config.get<std::string>("type", ""),
-        executor_,
-        absl::bind_front(
-            &Proxy::get_connector, this, std::ref(connectors_config)),
-        handler_config.get_child("settings", {}));
-    Handler *handler_ptr = handler.get();
-    handlers_[name] = std::move(handler);
-    return handler_ptr;
 }
 
 Connector *Proxy::get_connector(
@@ -85,7 +64,7 @@ Connector *Proxy::get_connector(
         executor_,
         absl::bind_front(
             &Proxy::get_connector, this, std::ref(connectors_config)),
-        connector_config.get_child("settings", {}));
+        connector_config);
     Connector *connector_ptr = connector.get();
     connectors_[name] = std::move(connector);
     return connector_ptr;

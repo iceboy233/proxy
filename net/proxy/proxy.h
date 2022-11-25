@@ -23,17 +23,13 @@ public:
     void load_config(const boost::property_tree::ptree &config);
 
 private:
-    Handler *get_handler(
-        const boost::property_tree::ptree &handlers_config,
-        const boost::property_tree::ptree &connectors_config,
-        std::string_view name);
     Connector *get_connector(
         const boost::property_tree::ptree &connectors_config,
         std::string_view name);
 
     any_io_executor executor_;
     std::vector<std::unique_ptr<system::Listener>> listeners_;
-    absl::flat_hash_map<std::string, std::unique_ptr<Handler>> handlers_;
+    std::vector<std::unique_ptr<Handler>> handlers_;
     absl::flat_hash_map<std::string, std::unique_ptr<Connector>> connectors_;
 };
 

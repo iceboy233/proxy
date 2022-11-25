@@ -35,10 +35,6 @@ miracle-proxy --config miracle.conf
 listeners {
     "" {
         endpoint 127.0.0.1:1080
-    }
-}
-handlers {
-    "" {
         type socks
     }
 }
@@ -50,15 +46,9 @@ handlers {
 listeners {
     "" {
         endpoint 0.0.0.0:8388
-    }
-}
-handlers {
-    "" {
         type shadowsocks
-        settings {
-            method aes-128-gcm
-            password 123456
-        }
+        method aes-128-gcm
+        password 123456
     }
 }
 ```
@@ -69,24 +59,16 @@ handlers {
 listeners {
     "" {
         endpoint 127.0.0.1:1080
-    }
-}
-handlers {
-    "" {
         type socks
-        settings {
-            connector proxy
-        }
+        connector proxy
     }
 }
 connectors {
     proxy {
         type shadowsocks
-        settings {
-            endpoint 1.2.3.4:8388
-            method aes-128-gcm
-            password 123456
-        }
+        endpoint 1.2.3.4:8388
+        method aes-128-gcm
+        password 123456
     }
 }
 ```

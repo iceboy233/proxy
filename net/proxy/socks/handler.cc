@@ -5,6 +5,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
+#include "absl/algorithm/algorithm.h"
 #include "absl/container/fixed_array.h"
 #include "base/types.h"
 
@@ -116,7 +117,7 @@ void Handler::TcpConnection::method_selection() {
         forward_read();
         return;
     }
-    if (std::find(&buffer[0], &buffer[nmethods], 0) == &buffer[nmethods]) {
+    if (!absl::linear_search(buffer.data(), buffer.data() + nmethods, 0)) {
         return;
     }
     buffer.remove_prefix(nmethods);

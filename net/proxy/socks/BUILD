@@ -20,6 +20,7 @@ cc_library(
     hdrs = ["handler.h"],
     deps = [
         "//net/proxy:interface",
+        "@com_google_absl//absl/algorithm",
         "@com_google_absl//absl/container:fixed_array",
         "@org_boost_boost//:endian",
         "@org_iceboy_trunk//base:types",

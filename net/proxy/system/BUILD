@@ -22,6 +22,7 @@ cc_library(
         "//net/proxy:interface",
         "@com_google_absl//absl/strings",
         "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:timer-list",
     ],
 )
 
@@ -35,6 +36,7 @@ cc_library(
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:asio",
         "@org_iceboy_trunk//net:endpoint",
+        "@org_iceboy_trunk//net:timer-list",
     ],
 )
 
@@ -46,6 +48,7 @@ cc_library(
         "//net/proxy:interface",
         "@com_google_absl//absl/container:fixed_array",
         "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:timer-list",
     ],
 )
 

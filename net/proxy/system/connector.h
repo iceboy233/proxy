@@ -1,9 +1,12 @@
 #ifndef _NET_PROXY_SYSTEM_CONNECTOR_H
 #define _NET_PROXY_SYSTEM_CONNECTOR_H
 
+#include <chrono>
+
 #include "net/proxy/connector.h"
 #include "net/proxy/system/tcp-socket-stream.h"
 #include "net/proxy/system/udp-socket-datagram.h"
+#include "net/timer-list.h"
 
 namespace net {
 namespace proxy {
@@ -11,7 +14,12 @@ namespace system {
 
 class Connector : public proxy::Connector {
 public:
-    explicit Connector(const any_io_executor &executor);
+    struct Options {
+        std::chrono::nanoseconds timeout = std::chrono::minutes(5);
+        bool tcp_no_delay = true;
+    };
+
+    Connector(const any_io_executor &executor, const Options &options);
 
     Connector(const Connector &) = delete;
     Connector &operator=(const Connector &) = delete;
@@ -56,6 +64,8 @@ private:
 
     any_io_executor executor_;
     tcp::resolver resolver_;
+    TimerList timer_list_;
+    bool tcp_no_delay_;
 };
 
 }  // namespace proxy

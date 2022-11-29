@@ -9,9 +9,11 @@ namespace net {
 namespace proxy {
 namespace system {
 
-Connector::Connector(const any_io_executor &executor)
+Connector::Connector(const any_io_executor &executor, const Options &options)
     : executor_(executor),
-      resolver_(executor_) {}
+      resolver_(executor_),
+      timer_list_(executor_, options.timeout),
+      tcp_no_delay_(options.tcp_no_delay) {}
 
 void Connector::connect_tcp_v4(
     const address_v4 &address,
@@ -85,20 +87,22 @@ void Connector::connect_tcp(
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    auto stream = std::make_unique<TcpSocketStream>(executor_);
+    auto stream = std::make_unique<TcpSocketStream>(
+        tcp::socket(executor_), timer_list_);
     tcp::socket &socket = stream->socket();
     async_connect(
         socket,
         endpoints,
-        [stream = std::move(stream), initial_data,
+        [this, stream = std::move(stream), initial_data,
             callback = std::move(callback)](
             std::error_code ec, const tcp::endpoint &) mutable {
             if (ec) {
                 std::move(callback)(ec, nullptr);
                 return;
             }
-            // TODO(iceboy): Make this an option.
-            stream->socket().set_option(tcp::no_delay(true));
+            if (tcp_no_delay_) {
+                stream->socket().set_option(tcp::no_delay(true));
+            }
             if (initial_data.size()) {
                 send_initial_data(
                     std::move(stream), initial_data, std::move(callback));
@@ -113,9 +117,9 @@ void Connector::send_initial_data(
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    tcp::socket &socket = stream->socket();
+    TcpSocketStream &stream_ref = *stream;
     async_write(
-        socket,
+        stream_ref,
         initial_data,
         [stream = std::move(stream), callback = std::move(callback)](
             std::error_code ec, size_t) mutable {

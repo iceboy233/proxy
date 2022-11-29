@@ -3,6 +3,7 @@
 
 #include "net/asio.h"
 #include "net/proxy/stream.h"
+#include "net/timer-list.h"
 
 namespace net {
 namespace proxy {
@@ -10,8 +11,7 @@ namespace system {
 
 class TcpSocketStream : public Stream {
 public:
-    explicit TcpSocketStream(const any_io_executor &executor)
-        : socket_(executor) {}
+    TcpSocketStream(tcp::socket socket, TimerList &timer_list);
 
     TcpSocketStream(const TcpSocketStream &) = delete;
     TcpSocketStream &operator=(const TcpSocketStream &) = delete;
@@ -27,12 +27,16 @@ public:
     void async_write_some(
         absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
+    
+    using Stream::async_read_some;
+    using Stream::async_write_some;
 
     tcp::socket &socket() { return socket_; }
     const tcp::socket &socket() const { return socket_; }
 
 private:
     tcp::socket socket_;
+    TimerList::Timer timer_;
 };
 
 }  // namespace proxy

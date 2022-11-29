@@ -1,5 +1,7 @@
 #include "net/proxy/system/listener.h"
 
+#include <chrono>
+
 #include "base/logging.h"
 #include "net/proxy/system/tcp-socket-stream.h"
 
@@ -10,23 +12,26 @@ namespace system {
 Listener::Listener(
     const any_io_executor &executor,
     const Endpoint &endpoint,
-    Handler &handler)
+    Handler &handler,
+    const Options &options)
     : executor_(executor),
       tcp_acceptor_(executor, endpoint),
-      handler_(handler) { accept(); }
+      handler_(handler),
+      timer_list_(executor_, options.timeout),
+      tcp_no_delay_(options.tcp_no_delay) { accept(); }
 
 void Listener::accept() {
-    auto stream = std::make_unique<TcpSocketStream>(executor_);
-    tcp::socket &socket = stream->socket();
     tcp_acceptor_.async_accept(
-        socket,
-        [this, stream = std::move(stream)](std::error_code ec) mutable {
+        [this](std::error_code ec, tcp::socket socket) mutable {
             if (ec) {
                 LOG(fatal) << "accept failed: " << ec;
                 return;
             }
-            // TODO(iceboy): Make this an option.
-            stream->socket().set_option(tcp::no_delay(true));
+            auto stream = std::make_unique<TcpSocketStream>(
+                std::move(socket), timer_list_);
+            if (tcp_no_delay_) {
+                stream->socket().set_option(tcp::no_delay(true));
+            }
             handler_.handle_stream(std::move(stream));
             accept();
         });

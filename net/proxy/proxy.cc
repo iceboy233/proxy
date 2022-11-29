@@ -19,7 +19,7 @@ void Proxy::load_config(const boost::property_tree::ptree &config) {
     if (connectors_config.find("") == connectors_config.not_found()) {
         boost::property_tree::ptree default_connector;
         default_connector.put("type", "system");
-        connectors_config.add_child("", default_connector);
+        connectors_config.push_back({"", default_connector});
     }
     for (const auto &pair : listeners_config) {
         const auto &listener_config = pair.second;

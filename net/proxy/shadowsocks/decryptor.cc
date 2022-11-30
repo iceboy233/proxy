@@ -9,13 +9,12 @@ namespace shadowsocks {
 Decryptor::Decryptor() : buffer_(131072) {}
 
 bool Decryptor::init(const PreSharedKey &pre_shared_key) {
-    salt_size_ = pre_shared_key.method().salt_size();
-    if (buffer_last_ - buffer_first_ < salt_size_) {
+    size_t salt_size = pre_shared_key.method().salt_size();
+    if (buffer_last_ - buffer_first_ < salt_size) {
         return false;
     }
-    memcpy(salt_.data(), &buffer_[buffer_first_], salt_size_);
-    session_subkey_.init(pre_shared_key, salt_.data());
-    buffer_first_ += salt_size_;
+    session_subkey_.init(pre_shared_key, &buffer_[buffer_first_]);
+    buffer_first_ += salt_size;
     return true;
 }
 
@@ -76,10 +75,6 @@ BufferSpan Decryptor::buffer() {
         buffer_first_ = 0;
     }
     return {&buffer_[buffer_last_], buffer_.size() - buffer_last_};
-}
-
-ConstBufferSpan Decryptor::salt() const {
-    return ConstBufferSpan(salt_.data(), salt_size_);
 }
 
 }  // namespace shadowsocks

@@ -20,11 +20,12 @@ public:
     void push_big_u16(uint16_t value);
     void push_big_u64(uint64_t value);
     void push_buffer(ConstBufferSpan buffer);
+    void push_random(size_t size);
     void finish_chunk();
-    void write_length_chunk(uint16_t length);
     void write_payload_chunk(ConstBufferSpan payload);
     void clear() { buffer_.clear(); }
 
+    const uint8_t *salt() const { return session_subkey_.salt(); }
     ConstBufferSpan buffer() const { return buffer_; }
 
 private:

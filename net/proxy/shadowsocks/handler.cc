@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <memory>
+#include <utility>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
@@ -356,23 +358,23 @@ void Handler::TcpConnection::backward_write() {
     ConstBufferSpan read_buffer(
         backward_read_buffer_.data(), backward_read_size_);
     do {
-        size_t chunk_size = std::min(
-            read_buffer.size(),
-            handler_.pre_shared_key_.method().max_chunk_size());
+        encryptor_.start_chunk();
         if (write_header_) {
-            encryptor_.start_chunk();
             encryptor_.push_u8(1);  // response
             encryptor_.push_big_u64(
                 std::chrono::duration_cast<std::chrono::seconds>(
                     std::chrono::system_clock::now().time_since_epoch())
                         .count());
-            encryptor_.push_buffer(decryptor_.salt());
-            encryptor_.push_big_u16(chunk_size);
-            encryptor_.finish_chunk();
+            encryptor_.push_buffer({
+                decryptor_.salt(),
+                handler_.pre_shared_key_.method().salt_size()});
             write_header_ = false;
-        } else {
-            encryptor_.write_length_chunk(chunk_size);
         }
+        size_t chunk_size = std::min(
+            read_buffer.size(),
+            handler_.pre_shared_key_.method().max_chunk_size());
+        encryptor_.push_big_u16(chunk_size);
+        encryptor_.finish_chunk();
         encryptor_.write_payload_chunk(read_buffer.subspan(0, chunk_size));
         read_buffer.remove_prefix(chunk_size);
     } while (!read_buffer.empty());

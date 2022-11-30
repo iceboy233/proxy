@@ -1,5 +1,9 @@
 #include "net/proxy/shadowsocks/connector.h"
 
+#include <chrono>
+#include <memory>
+#include <utility>
+
 #include "absl/base/attributes.h"
 #include "net/proxy/shadowsocks/decryptor.h"
 #include "net/proxy/shadowsocks/encryptor.h"
@@ -50,6 +54,7 @@ private:
 
     enum class ReadState {
         init,
+        header,
         length,
         payload,
         payload_tail,
@@ -72,7 +77,12 @@ Connector::Connector(
 
 bool Connector::init(const Config &config) {
     endpoint_ = config.endpoint;
-    return pre_shared_key_.init(*config.method, config.password);
+    if (!pre_shared_key_.init(*config.method, config.password)) {
+        return false;
+    }
+    min_padding_length_ = config.min_padding_length;
+    max_padding_length_ = config.max_padding_length;
+    return true;
 }
 
 void Connector::connect_tcp_v4(
@@ -158,11 +168,29 @@ void Connector::TcpStream::start(
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
     // TODO: split chunks if too large
-    encryptor_.write_length_chunk(7 + initial_data.size());
+    encryptor_.start_chunk();
+    size_t padding_size = absl::Uniform<size_t>(
+        connector_.bit_gen_,
+        connector_.min_padding_length_,
+        connector_.max_padding_length_);
+    if (connector_.pre_shared_key_.method().is_spec_2022()) {
+        encryptor_.push_u8(0);  // request
+        encryptor_.push_big_u64(
+            std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count());
+        encryptor_.push_big_u16(padding_size + initial_data.size() + 9);
+    } else {
+        encryptor_.push_big_u16(initial_data.size() + 7);
+    }
+    encryptor_.finish_chunk();
     encryptor_.start_chunk();
     encryptor_.push_u8(1);  // ipv4
     encryptor_.push_buffer(address.to_bytes());
     encryptor_.push_big_u16(port);
+    if (connector_.pre_shared_key_.method().is_spec_2022()) {
+        encryptor_.push_big_u16(padding_size);
+        encryptor_.push_random(padding_size);
+    }
     encryptor_.push_buffer({initial_data.data(), initial_data.size()});
     encryptor_.finish_chunk();
     connect(std::move(callback));
@@ -175,11 +203,29 @@ void Connector::TcpStream::start(
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
     // TODO: split chunks if too large
-    encryptor_.write_length_chunk(19 + initial_data.size());
+    encryptor_.start_chunk();
+    size_t padding_size = absl::Uniform<size_t>(
+        connector_.bit_gen_,
+        connector_.min_padding_length_,
+        connector_.max_padding_length_);
+    if (connector_.pre_shared_key_.method().is_spec_2022()) {
+        encryptor_.push_u8(0);  // request
+        encryptor_.push_big_u64(
+            std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count());
+        encryptor_.push_big_u16(padding_size + initial_data.size() + 21);
+    } else {
+        encryptor_.push_big_u16(initial_data.size() + 19);
+    }
+    encryptor_.finish_chunk();
     encryptor_.start_chunk();
     encryptor_.push_u8(4);  // ipv6
     encryptor_.push_buffer(address.to_bytes());
     encryptor_.push_big_u16(port);
+    if (connector_.pre_shared_key_.method().is_spec_2022()) {
+        encryptor_.push_big_u16(padding_size);
+        encryptor_.push_random(padding_size);
+    }
     encryptor_.push_buffer({initial_data.data(), initial_data.size()});
     encryptor_.finish_chunk();
     connect(std::move(callback));
@@ -192,12 +238,31 @@ void Connector::TcpStream::start(
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
     // TODO: split chunks if too large
-    encryptor_.write_length_chunk(2 + host.size() + 2 + initial_data.size());
+    encryptor_.start_chunk();
+    size_t padding_size = absl::Uniform<size_t>(
+        connector_.bit_gen_,
+        connector_.min_padding_length_,
+        connector_.max_padding_length_);
+    if (connector_.pre_shared_key_.method().is_spec_2022()) {
+        encryptor_.push_u8(0);  // request
+        encryptor_.push_big_u64(
+            std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count());
+        encryptor_.push_big_u16(
+            host.size() + padding_size + initial_data.size() + 6);
+    } else {
+        encryptor_.push_big_u16(host.size() + initial_data.size() + 4);
+    }
+    encryptor_.finish_chunk();
     encryptor_.start_chunk();
     encryptor_.push_u8(3);  // host
     encryptor_.push_u8(host.size());
     encryptor_.push_buffer(host);
     encryptor_.push_big_u16(port);
+    if (connector_.pre_shared_key_.method().is_spec_2022()) {
+        encryptor_.push_big_u16(padding_size);
+        encryptor_.push_random(padding_size);
+    }
     encryptor_.push_buffer({initial_data.data(), initial_data.size()});
     encryptor_.finish_chunk();
     connect(std::move(callback));
@@ -240,8 +305,44 @@ void Connector::TcpStream::async_read_some(
                 read(buffers, std::move(callback));
                 return;
             }
-            read_state_ = ReadState::length;
+            if (!connector_.pre_shared_key_.method().is_spec_2022()) {
+                read_state_ = ReadState::length;
+                continue;
+            }
+            read_state_ = ReadState::header;
             ABSL_FALLTHROUGH_INTENDED;
+        case ReadState::header:
+            if (!decryptor_.start_chunk(
+                connector_.pre_shared_key_.method().salt_size() + 11)) {
+                read(buffers, std::move(callback));
+                return;
+            }
+            if (decryptor_.pop_u8() != 1) {
+                std::move(callback)(
+                    make_error_code(std::errc::result_out_of_range), 0);
+                return;
+            }
+            if (std::abs(static_cast<int64_t>(decryptor_.pop_big_u64()) -
+                    std::chrono::duration_cast<std::chrono::seconds>(
+                        std::chrono::system_clock::now().time_since_epoch())
+                            .count()) > 30) {
+                std::move(callback)(
+                    make_error_code(std::errc::result_out_of_range), 0);
+                return;
+            }
+            if (memcmp(
+                encryptor_.salt(),
+                decryptor_.pop_buffer(
+                    connector_.pre_shared_key_.method().salt_size()),
+                connector_.pre_shared_key_.method().salt_size())) {
+                std::move(callback)(
+                    make_error_code(std::errc::result_out_of_range), 0);
+                return;
+            }
+            read_length_ = decryptor_.pop_big_u16();
+            decryptor_.finish_chunk();
+            read_state_ = ReadState::payload;
+            continue;
         case ReadState::length:
             if (!decryptor_.start_chunk(2)) {
                 read(buffers, std::move(callback));
@@ -309,7 +410,9 @@ void Connector::TcpStream::async_write_some(
     encryptor_.clear();
     for (const_buffer buffer : buffers) {
         // TODO: split chunks if too large
-        encryptor_.write_length_chunk(buffer.size());
+        encryptor_.start_chunk();
+        encryptor_.push_big_u16(buffer.size());
+        encryptor_.finish_chunk();
         encryptor_.write_payload_chunk({buffer.data(), buffer.size()});
         total_size += buffer.size();
     }

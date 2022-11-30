@@ -40,6 +40,12 @@ void Encryptor::push_buffer(ConstBufferSpan buffer) {
     memcpy(&buffer_[offset], buffer.data(), buffer.size());
 }
 
+void Encryptor::push_random(size_t size) {
+    size_t offset = buffer_.size();
+    buffer_.resize(offset + size);
+    RAND_bytes(&buffer_[offset], size);
+}
+
 void Encryptor::finish_chunk() {
     size_t offset = buffer_.size();
     buffer_.resize(offset + 16);
@@ -47,14 +53,6 @@ void Encryptor::finish_chunk() {
         {&buffer_[chunk_offset_], offset - chunk_offset_},
         &buffer_[chunk_offset_],
         &buffer_[offset]);
-}
-
-void Encryptor::write_length_chunk(uint16_t length) {
-    size_t offset = buffer_.size();
-    buffer_.resize(offset + 18);
-    boost::endian::big_uint16_at length_big = length;
-    session_subkey_.encrypt(
-        {length_big.data(), 2}, &buffer_[offset], &buffer_[offset + 2]);
 }
 
 void Encryptor::write_payload_chunk(ConstBufferSpan payload) {

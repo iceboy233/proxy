@@ -26,8 +26,8 @@ public:
     void finish_chunk();
     void advance(size_t size);
 
+    const uint8_t *salt() const { return session_subkey_.salt(); }
     BufferSpan buffer();
-    ConstBufferSpan salt() const;
 
 private:
     SessionSubkey session_subkey_;
@@ -35,8 +35,6 @@ private:
     size_t buffer_first_ = 0;
     size_t buffer_last_ = 0;
     bool discard_ = false;
-    std::array<uint8_t, 32> salt_;
-    size_t salt_size_;
 };
 
 }  // namespace shadowsocks

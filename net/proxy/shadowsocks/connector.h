@@ -1,6 +1,7 @@
 #ifndef _NET_PROXY_SHADOWSOCKS_CONNECTOR_H
 #define _NET_PROXY_SHADOWSOCKS_CONNECTOR_H
 
+#include "absl/random/random.h"
 #include "net/endpoint.h"
 #include "net/proxy/connector.h"
 #include "net/proxy/shadowsocks/method.h"
@@ -23,6 +24,8 @@ public:
         Endpoint endpoint;
         const Method *method = &Method::aes_128_gcm();
         std::string password;
+        size_t min_padding_length = 1;
+        size_t max_padding_length = 900;
     };
 
     bool init(const Config &config);
@@ -58,6 +61,9 @@ private:
     proxy::Connector &base_connector_;
     Endpoint endpoint_;
     PreSharedKey pre_shared_key_;
+    size_t min_padding_length_;
+    size_t max_padding_length_;
+    absl::BitGen bit_gen_;
 };
 
 }  // namespace shadowsocks

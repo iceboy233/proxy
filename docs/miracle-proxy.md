@@ -67,8 +67,8 @@ connectors {
     proxy {
         type shadowsocks
         endpoint 1.2.3.4:8388
-        method aes-128-gcm
-        password 123456
+        method 2022-blake3-aes-128-gcm
+        password AAAAAAAAAAAAAAAAAAAAAA
     }
 }
 ```

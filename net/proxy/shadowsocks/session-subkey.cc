@@ -20,6 +20,7 @@ SessionSubkey::~SessionSubkey() {
 
 void SessionSubkey::init(
     const PreSharedKey &pre_shared_key, const uint8_t *salt) {
+    memcpy(salt_.data(), salt, pre_shared_key.method().salt_size());
     std::array<uint8_t, 32> key;
     if (pre_shared_key.method().is_spec_2022()) {
         blake3_hasher hasher;
@@ -28,13 +29,13 @@ void SessionSubkey::init(
         blake3_hasher_update(
             &hasher, pre_shared_key.data(), pre_shared_key.size());
         blake3_hasher_update(
-            &hasher, salt, pre_shared_key.method().salt_size());
+            &hasher, salt_.data(), pre_shared_key.method().salt_size());
         blake3_hasher_finalize(&hasher, key.data(), pre_shared_key.size());
     } else {
         if (!HKDF(
             key.data(), pre_shared_key.size(), EVP_sha1(),
             pre_shared_key.data(), pre_shared_key.size(),
-            salt, pre_shared_key.method().salt_size(),
+            salt_.data(), pre_shared_key.method().salt_size(),
             reinterpret_cast<const uint8_t *>("ss-subkey"), 9)) {
             LOG(fatal) << "HKDF failed";
             abort();

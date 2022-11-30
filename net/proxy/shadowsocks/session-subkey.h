@@ -26,8 +26,11 @@ public:
     void encrypt(ConstBufferSpan in, uint8_t *out, uint8_t out_tag[16]);
     bool decrypt(ConstBufferSpan in, const uint8_t in_tag[16], uint8_t *out);
 
+    const uint8_t *salt() const { return salt_.data(); }
+
 private:
     EVP_AEAD_CTX aead_ctx_;
+    std::array<uint8_t, 32> salt_;
     std::array<boost::endian::little_uint64_t, 3> nonce_ = {};
     static_assert(sizeof(nonce_) == 24);
 };

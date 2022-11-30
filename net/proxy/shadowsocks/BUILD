@@ -25,6 +25,7 @@ cc_library(
         ":pre-shared-key",
         "//net/proxy:interface",
         "@com_google_absl//absl/base",
+        "@com_google_absl//absl/random",
         "@org_iceboy_trunk//net:endpoint",
     ],
 )

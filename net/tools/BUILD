@@ -95,33 +95,3 @@ cc_binary(
         "@org_iceboy_trunk//net/rpc:server",
     ],
 )
-
-cc_binary(
-    name = "shadowsocks-server",
-    srcs = ["shadowsocks-server.cc"],
-    deps = [
-        "//net/proxy/shadowsocks:method",
-        "//net/proxy/shadowsocks:pre-shared-key",
-        "//net/proxy/system:connector",
-        "//net/shadowsocks:encryption",
-        "//net/shadowsocks:tcp-server",
-        "//net/shadowsocks:udp-server",
-        "@org_iceboy_trunk//base:flags",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net:endpoint",
-    ],
-)
-
-cc_binary(
-    name = "socks-server",
-    srcs = ["socks-server.cc"],
-    deps = [
-        "//net/proxy/system:connector",
-        "//net/socks:tcp-server",
-        "@org_iceboy_trunk//base:flags",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net:endpoint",
-    ],
-)

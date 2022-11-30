@@ -47,8 +47,8 @@ listeners {
     "" {
         endpoint 0.0.0.0:8388
         type shadowsocks
-        method aes-128-gcm
-        password 123456
+        method 2022-blake3-aes-128-gcm
+        password AAAAAAAAAAAAAAAAAAAAAA
     }
 }
 ```

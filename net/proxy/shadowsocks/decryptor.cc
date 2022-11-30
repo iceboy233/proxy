@@ -9,11 +9,13 @@ namespace shadowsocks {
 Decryptor::Decryptor() : buffer_(131072) {}
 
 bool Decryptor::init(const PreSharedKey &pre_shared_key) {
-    if (buffer_last_ - buffer_first_ < pre_shared_key.method().salt_size()) {
+    salt_size_ = pre_shared_key.method().salt_size();
+    if (buffer_last_ - buffer_first_ < salt_size_) {
         return false;
     }
-    session_subkey_.init(pre_shared_key, &buffer_[buffer_first_]);
-    buffer_first_ += pre_shared_key.method().salt_size();
+    memcpy(salt_.data(), &buffer_[buffer_first_], salt_size_);
+    session_subkey_.init(pre_shared_key, salt_.data());
+    buffer_first_ += salt_size_;
     return true;
 }
 
@@ -39,7 +41,13 @@ uint8_t Decryptor::pop_u8() {
 
 uint16_t Decryptor::pop_big_u16() {
     uint16_t result = boost::endian::load_big_u16(&buffer_[buffer_first_]);
-    buffer_first_ += sizeof(uint16_t);
+    buffer_first_ += 2;
+    return result;
+}
+
+uint64_t Decryptor::pop_big_u64() {
+    uint64_t result = boost::endian::load_big_u64(&buffer_[buffer_first_]);
+    buffer_first_ += 8;
     return result;
 }
 
@@ -68,6 +76,10 @@ BufferSpan Decryptor::buffer() {
         buffer_first_ = 0;
     }
     return {&buffer_[buffer_last_], buffer_.size() - buffer_last_};
+}
+
+ConstBufferSpan Decryptor::salt() const {
+    return ConstBufferSpan(salt_.data(), salt_size_);
 }
 
 }  // namespace shadowsocks

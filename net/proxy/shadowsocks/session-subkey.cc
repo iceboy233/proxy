@@ -4,6 +4,7 @@
 #include <openssl/hkdf.h>
 
 #include "base/logging.h"
+#include "third_party/blake3/blake3.h"
 
 namespace net {
 namespace proxy {
@@ -20,13 +21,24 @@ SessionSubkey::~SessionSubkey() {
 void SessionSubkey::init(
     const PreSharedKey &pre_shared_key, const uint8_t *salt) {
     std::array<uint8_t, 32> key;
-    if (!HKDF(
-        key.data(), pre_shared_key.size(), EVP_sha1(),
-        pre_shared_key.data(), pre_shared_key.size(),
-        salt, pre_shared_key.method().salt_size(),
-        reinterpret_cast<const uint8_t *>("ss-subkey"), 9)) {
-        LOG(fatal) << "HKDF failed";
-        abort();
+    if (pre_shared_key.method().is_spec_2022()) {
+        blake3_hasher hasher;
+        blake3_hasher_init_derive_key_raw(
+            &hasher, "shadowsocks 2022 session subkey", 31);
+        blake3_hasher_update(
+            &hasher, pre_shared_key.data(), pre_shared_key.size());
+        blake3_hasher_update(
+            &hasher, salt, pre_shared_key.method().salt_size());
+        blake3_hasher_finalize(&hasher, key.data(), pre_shared_key.size());
+    } else {
+        if (!HKDF(
+            key.data(), pre_shared_key.size(), EVP_sha1(),
+            pre_shared_key.data(), pre_shared_key.size(),
+            salt, pre_shared_key.method().salt_size(),
+            reinterpret_cast<const uint8_t *>("ss-subkey"), 9)) {
+            LOG(fatal) << "HKDF failed";
+            abort();
+        }
     }
     if (!EVP_AEAD_CTX_init(
         &aead_ctx_, pre_shared_key.method().aead_,

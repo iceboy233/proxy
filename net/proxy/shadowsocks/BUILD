@@ -92,6 +92,8 @@ cc_library(
     deps = [
         ":method",
         "@boringssl//:crypto",
+        "@com_google_absl//absl/strings",
+        "@org_iceboy_trunk//base:logging",
     ],
 )
 
@@ -101,6 +103,7 @@ cc_library(
     hdrs = ["session-subkey.h"],
     deps = [
         ":pre-shared-key",
+        "//third_party/blake3",
         "@org_boost_boost//:endian",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//base:types",

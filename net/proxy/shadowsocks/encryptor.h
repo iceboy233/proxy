@@ -18,6 +18,7 @@ public:
     void start_chunk();
     void push_u8(uint8_t value);
     void push_big_u16(uint16_t value);
+    void push_big_u64(uint64_t value);
     void push_buffer(ConstBufferSpan buffer);
     void finish_chunk();
     void write_length_chunk(uint16_t length);

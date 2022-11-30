@@ -24,8 +24,14 @@ void Encryptor::push_u8(uint8_t value) {
 
 void Encryptor::push_big_u16(uint16_t value) {
     size_t offset = buffer_.size();
-    buffer_.resize(offset + sizeof(uint16_t));
+    buffer_.resize(offset + 2);
     boost::endian::store_big_u16(&buffer_[offset], value);
+}
+
+void Encryptor::push_big_u64(uint64_t value) {
+    size_t offset = buffer_.size();
+    buffer_.resize(offset + 8);
+    boost::endian::store_big_u64(&buffer_[offset], value);
 }
 
 void Encryptor::push_buffer(ConstBufferSpan buffer) {

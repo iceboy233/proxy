@@ -1,6 +1,7 @@
 #include "net/proxy/shadowsocks/handler.h"
 
 #include <algorithm>
+#include <chrono>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
@@ -49,6 +50,7 @@ private:
     ConstBufferSpan read_buffer_;
     absl::FixedArray<uint8_t, 0> backward_read_buffer_;
     size_t backward_read_size_;
+    bool write_header_;
 };
 
 Handler::Handler(
@@ -72,7 +74,8 @@ Handler::TcpConnection::TcpConnection(
     : handler_(handler),
       stream_(std::move(stream)),
       // TODO: find out how to use larger buffer
-      backward_read_buffer_(4096) {}
+      backward_read_buffer_(4096),
+      write_header_(handler_.pre_shared_key_.method().is_spec_2022()) {}
 
 void Handler::TcpConnection::forward_read() {
     if (!stream_) {
@@ -102,9 +105,25 @@ void Handler::TcpConnection::forward_parse() {
         read_state_ = ReadState::header_length;
         ABSL_FALLTHROUGH_INTENDED;
     case ReadState::header_length:
-        if (!decryptor_.start_chunk(2)) {
-            forward_read();
-            return;
+        if (handler_.pre_shared_key_.method().is_spec_2022()) {
+            if (!decryptor_.start_chunk(11)) {
+                forward_read();
+                return;
+            }
+            if (decryptor_.pop_u8() != 0) {
+                return;
+            }
+            if (std::abs(static_cast<int64_t>(decryptor_.pop_big_u64()) -
+                    std::chrono::duration_cast<std::chrono::seconds>(
+                        std::chrono::system_clock::now().time_since_epoch())
+                            .count()) > 30) {
+                return;
+            }
+        } else {
+            if (!decryptor_.start_chunk(2)) {
+                forward_read();
+                return;
+            }
         }
         read_length_ = decryptor_.pop_big_u16();
         decryptor_.finish_chunk();
@@ -148,13 +167,32 @@ void Handler::TcpConnection::forward_parse() {
 }
 
 void Handler::TcpConnection::forward_parse_ipv4(size_t header_length) {
+    if (header_length < 7) {
+        return;
+    }
     address_v4::bytes_type address_bytes;
     memcpy(
         address_bytes.data(),
         decryptor_.pop_buffer(sizeof(address_bytes)),
         sizeof(address_bytes));
     uint16_t port = decryptor_.pop_big_u16();
-    size_t initial_data_length = header_length - 7;
+    size_t initial_data_length;
+    if (handler_.pre_shared_key_.method().is_spec_2022()) {
+        if (header_length < 9) {
+            return;
+        }
+        size_t padding_length = decryptor_.pop_big_u16();
+        if (header_length < 9 + padding_length) {
+            return;
+        }
+        decryptor_.pop_buffer(padding_length);
+        initial_data_length = header_length - (9 + padding_length);
+        if (!padding_length && !initial_data_length) {
+            return;
+        }
+    } else {
+        initial_data_length = header_length - 7;
+    }
     const_buffer initial_data(
         decryptor_.pop_buffer(initial_data_length),
         initial_data_length);
@@ -178,13 +216,32 @@ void Handler::TcpConnection::forward_parse_ipv4(size_t header_length) {
 }
 
 void Handler::TcpConnection::forward_parse_ipv6(size_t header_length) {
+    if (header_length < 19) {
+        return;
+    }
     address_v6::bytes_type address_bytes;
     memcpy(
         address_bytes.data(),
         decryptor_.pop_buffer(sizeof(address_bytes)),
         sizeof(address_bytes));
     uint16_t port = decryptor_.pop_big_u16();
-    size_t initial_data_length = header_length - 19;
+    size_t initial_data_length;
+    if (handler_.pre_shared_key_.method().is_spec_2022()) {
+        if (header_length < 21) {
+            return;
+        }
+        size_t padding_length = decryptor_.pop_big_u16();
+        if (header_length < 21 + padding_length) {
+            return;
+        }
+        decryptor_.pop_buffer(padding_length);
+        initial_data_length = header_length - (21 + padding_length);
+        if (!padding_length && !initial_data_length) {
+            return;
+        }
+    } else {
+        initial_data_length = header_length - 19;
+    }
     const_buffer initial_data(
         decryptor_.pop_buffer(initial_data_length),
         initial_data_length);
@@ -209,14 +266,31 @@ void Handler::TcpConnection::forward_parse_ipv6(size_t header_length) {
 
 void Handler::TcpConnection::forward_parse_host(size_t header_length) {
     size_t host_length = decryptor_.pop_u8();
-    if (2 + host_length + 2 > header_length) {
+    if (header_length < host_length + 4) {
         return;
     }
     std::string_view host(
         reinterpret_cast<char *>(decryptor_.pop_buffer(host_length)),
         host_length);
     uint16_t port = decryptor_.pop_big_u16();
-    size_t initial_data_length = header_length - (2 + host_length + 2);
+    size_t initial_data_length;
+    if (handler_.pre_shared_key_.method().is_spec_2022()) {
+        if (header_length < host_length + 6) {
+            return;
+        }
+        size_t padding_length = decryptor_.pop_big_u16();
+        if (header_length < host_length + padding_length + 6) {
+            return;
+        }
+        decryptor_.pop_buffer(padding_length);
+        initial_data_length =
+            header_length - (host_length + padding_length + 6);
+        if (!padding_length && !initial_data_length) {
+            return;
+        }
+    } else {
+        initial_data_length = header_length - (host_length + 4);
+    }
     const_buffer initial_data(
         decryptor_.pop_buffer(initial_data_length),
         initial_data_length);
@@ -285,7 +359,20 @@ void Handler::TcpConnection::backward_write() {
         size_t chunk_size = std::min(
             read_buffer.size(),
             handler_.pre_shared_key_.method().max_chunk_size());
-        encryptor_.write_length_chunk(chunk_size);
+        if (write_header_) {
+            encryptor_.start_chunk();
+            encryptor_.push_u8(1);  // response
+            encryptor_.push_big_u64(
+                std::chrono::duration_cast<std::chrono::seconds>(
+                    std::chrono::system_clock::now().time_since_epoch())
+                        .count());
+            encryptor_.push_buffer(decryptor_.salt());
+            encryptor_.push_big_u16(chunk_size);
+            encryptor_.finish_chunk();
+            write_header_ = false;
+        } else {
+            encryptor_.write_length_chunk(chunk_size);
+        }
         encryptor_.write_payload_chunk(read_buffer.subspan(0, chunk_size));
         read_buffer.remove_prefix(chunk_size);
     } while (!read_buffer.empty());

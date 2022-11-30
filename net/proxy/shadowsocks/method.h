@@ -16,19 +16,26 @@ public:
     static const Method &aes_256_gcm();
     static const Method &chacha20_ietf_poly1305();
     static const Method &xchacha20_ietf_poly1305();
+    static const Method &_2022_blake3_aes_128_gcm();
+    static const Method &_2022_blake3_aes_192_gcm();
+    static const Method &_2022_blake3_aes_256_gcm();
+    static const Method &_2022_blake3_chacha20_poly1305();
+    static const Method &_2022_blake3_xchacha20_poly1305();
     static const Method *find(std::string_view name);
 
     size_t key_size() const { return EVP_AEAD_key_length(aead_); }
     size_t salt_size() const { return EVP_AEAD_key_length(aead_); }
     size_t nonce_size() const { return EVP_AEAD_nonce_length(aead_); }
-    size_t max_chunk_size() const { return 16383; }
+    size_t max_chunk_size() const { return is_spec_2022_ ? 65535 : 16383; }
+    bool is_spec_2022() const { return is_spec_2022_; }
 
 private:
-    explicit Method(const EVP_AEAD *aead);
+    Method(const EVP_AEAD *aead, bool is_spec_2022);
 
     friend class SessionSubkey;
 
     const EVP_AEAD *aead_;
+    bool is_spec_2022_;
 };
 
 }  // namespace shadowsocks

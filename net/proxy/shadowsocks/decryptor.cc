@@ -26,9 +26,7 @@ bool Decryptor::start_chunk(size_t size) {
         {&buffer_[buffer_first_], size},
         &buffer_[buffer_first_ + size],
         &buffer_[buffer_first_])) {
-        buffer_first_ = 0;
-        buffer_last_ = 0;
-        discard_ = true;
+        discard();
         return false;
     }
     return true;
@@ -65,6 +63,12 @@ void Decryptor::advance(size_t size) {
         return;
     }
     buffer_last_ += size;
+}
+
+void Decryptor::discard() {
+    buffer_first_ = 0;
+    buffer_last_ = 0;
+    discard_ = true;
 }
 
 BufferSpan Decryptor::buffer() {

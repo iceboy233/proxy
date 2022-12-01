@@ -25,6 +25,7 @@ public:
     uint8_t *pop_buffer(size_t size);
     void finish_chunk();
     void advance(size_t size);
+    void discard();
 
     const uint8_t *salt() const { return session_subkey_.salt(); }
     BufferSpan buffer();

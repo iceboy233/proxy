@@ -6,6 +6,7 @@
 #include "net/proxy/connector.h"
 #include "net/proxy/shadowsocks/method.h"
 #include "net/proxy/shadowsocks/pre-shared-key.h"
+#include "net/proxy/shadowsocks/salt-filter.h"
 
 namespace net {
 namespace proxy {
@@ -63,6 +64,7 @@ private:
     PreSharedKey pre_shared_key_;
     size_t min_padding_length_;
     size_t max_padding_length_;
+    SaltFilter salt_filter_;
     absl::BitGen bit_gen_;
 };
 

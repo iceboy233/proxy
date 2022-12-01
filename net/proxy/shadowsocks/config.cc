@@ -58,6 +58,8 @@ std::unique_ptr<Connector> create_connector(
         return nullptr;
     }
     config.password = settings.get<std::string>("password", "");
+    config.min_padding_length = settings.get<size_t>("min-padding-length", 1);
+    config.max_padding_length = settings.get<size_t>("max-padding-length", 900);
     std::string connector_str = settings.get<std::string>("connector", "");
     proxy::Connector *base_connector = get_connector_func(connector_str);
     if (!base_connector) {

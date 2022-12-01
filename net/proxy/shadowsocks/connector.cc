@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "absl/base/attributes.h"
+#include "base/logging.h"
 #include "net/proxy/shadowsocks/decryptor.h"
 #include "net/proxy/shadowsocks/encryptor.h"
 #include "net/proxy/stream.h"
@@ -167,6 +168,8 @@ void Connector::TcpStream::start(
     const_buffer initial_data,
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
+    connector_.salt_filter_.insert({
+        encryptor_.salt(), connector_.pre_shared_key_.method().salt_size()});
     // TODO: split chunks if too large
     encryptor_.start_chunk();
     size_t padding_size = absl::Uniform<size_t>(
@@ -202,6 +205,8 @@ void Connector::TcpStream::start(
     const_buffer initial_data,
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
+    connector_.salt_filter_.insert({
+        encryptor_.salt(), connector_.pre_shared_key_.method().salt_size()});
     // TODO: split chunks if too large
     encryptor_.start_chunk();
     size_t padding_size = absl::Uniform<size_t>(
@@ -237,6 +242,8 @@ void Connector::TcpStream::start(
     const_buffer initial_data,
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
+    connector_.salt_filter_.insert({
+        encryptor_.salt(), connector_.pre_shared_key_.method().salt_size()});
     // TODO: split chunks if too large
     encryptor_.start_chunk();
     size_t padding_size = absl::Uniform<size_t>(
@@ -317,17 +324,27 @@ void Connector::TcpStream::async_read_some(
                 read(buffers, std::move(callback));
                 return;
             }
+            if (!connector_.salt_filter_.test_and_insert({
+                decryptor_.salt(),
+                connector_.pre_shared_key_.method().salt_size()})) {
+                LOG(warning) << "duplicated salt";
+                decryptor_.discard();
+                read(buffers, std::move(callback));
+                return;
+            }
             if (decryptor_.pop_u8() != 1) {
-                std::move(callback)(
-                    make_error_code(std::errc::result_out_of_range), 0);
+                LOG(warning) << "unexpected header type";
+                decryptor_.discard();
+                read(buffers, std::move(callback));
                 return;
             }
             if (std::abs(static_cast<int64_t>(decryptor_.pop_big_u64()) -
                     std::chrono::duration_cast<std::chrono::seconds>(
                         std::chrono::system_clock::now().time_since_epoch())
                             .count()) > 30) {
-                std::move(callback)(
-                    make_error_code(std::errc::result_out_of_range), 0);
+                LOG(warning) << "time difference too large";
+                decryptor_.discard();
+                read(buffers, std::move(callback));
                 return;
             }
             if (memcmp(
@@ -335,8 +352,9 @@ void Connector::TcpStream::async_read_some(
                 decryptor_.pop_buffer(
                     connector_.pre_shared_key_.method().salt_size()),
                 connector_.pre_shared_key_.method().salt_size())) {
-                std::move(callback)(
-                    make_error_code(std::errc::result_out_of_range), 0);
+                LOG(warning) << "salt mismatch";
+                decryptor_.discard();
+                read(buffers, std::move(callback));
                 return;
             }
             read_length_ = decryptor_.pop_big_u16();

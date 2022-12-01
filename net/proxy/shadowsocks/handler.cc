@@ -9,6 +9,7 @@
 
 #include "absl/base/attributes.h"
 #include "absl/container/fixed_array.h"
+#include "base/logging.h"
 #include "net/proxy/shadowsocks/decryptor.h"
 #include "net/proxy/shadowsocks/encryptor.h"
 
@@ -113,12 +114,18 @@ void Handler::TcpConnection::forward_parse() {
                 return;
             }
             if (decryptor_.pop_u8() != 0) {
+                LOG(warning) << "unexpected header type";
+                decryptor_.discard();
+                forward_read();
                 return;
             }
             if (std::abs(static_cast<int64_t>(decryptor_.pop_big_u64()) -
                     std::chrono::duration_cast<std::chrono::seconds>(
                         std::chrono::system_clock::now().time_since_epoch())
                             .count()) > 30) {
+                LOG(warning) << "time difference too large";
+                decryptor_.discard();
+                forward_read();
                 return;
             }
         } else {
@@ -126,6 +133,14 @@ void Handler::TcpConnection::forward_parse() {
                 forward_read();
                 return;
             }
+        }
+        if (!handler_.salt_filter_.test_and_insert({
+            decryptor_.salt(),
+            handler_.pre_shared_key_.method().salt_size()})) {
+            LOG(warning) << "duplicated salt";
+            decryptor_.discard();
+            forward_read();
+            return;
         }
         read_length_ = decryptor_.pop_big_u16();
         decryptor_.finish_chunk();
@@ -139,17 +154,15 @@ void Handler::TcpConnection::forward_parse() {
         switch (decryptor_.pop_u8()) {
         case 1:  // ipv4
             forward_parse_ipv4(read_length_);
-            return;
+            break;
         case 4:  // ipv6
             forward_parse_ipv6(read_length_);
-            return;
+            break;
         case 3:  // host
             forward_parse_host(read_length_);
-            return;
-        default:
-            return;
+            break;
         }
-        ABSL_FALLTHROUGH_INTENDED;
+        return;
     case ReadState::length:
         if (!decryptor_.start_chunk(2)) {
             forward_read();
@@ -213,6 +226,9 @@ void Handler::TcpConnection::forward_parse_ipv4(size_t header_length) {
             connection->remote_stream_ = std::move(stream);
             connection->forward_parse();
             connection->encryptor_.init(connection->handler_.pre_shared_key_);
+            connection->handler_.salt_filter_.insert({
+                connection->encryptor_.salt(),
+                connection->handler_.pre_shared_key_.method().salt_size()});
             connection->backward_read();
         });
 }
@@ -262,6 +278,9 @@ void Handler::TcpConnection::forward_parse_ipv6(size_t header_length) {
             connection->remote_stream_ = std::move(stream);
             connection->forward_parse();
             connection->encryptor_.init(connection->handler_.pre_shared_key_);
+            connection->handler_.salt_filter_.insert({
+                connection->encryptor_.salt(),
+                connection->handler_.pre_shared_key_.method().salt_size()});
             connection->backward_read();
         });
 }
@@ -311,6 +330,9 @@ void Handler::TcpConnection::forward_parse_host(size_t header_length) {
             connection->remote_stream_ = std::move(stream);
             connection->forward_parse();
             connection->encryptor_.init(connection->handler_.pre_shared_key_);
+            connection->handler_.salt_filter_.insert({
+                connection->encryptor_.salt(),
+                connection->handler_.pre_shared_key_.method().salt_size()});
             connection->backward_read();
         });
 }

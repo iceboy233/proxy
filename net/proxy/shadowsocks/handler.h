@@ -5,6 +5,7 @@
 #include "net/proxy/connector.h"
 #include "net/proxy/handler.h"
 #include "net/proxy/shadowsocks/pre-shared-key.h"
+#include "net/proxy/shadowsocks/salt-filter.h"
 
 namespace net {
 namespace proxy {
@@ -30,6 +31,7 @@ private:
 
     proxy::Connector &connector_;
     PreSharedKey pre_shared_key_;
+    SaltFilter salt_filter_;
 };
 
 }  // namespace shadowsocks

@@ -1,6 +1,11 @@
 #ifndef _NET_PROXY_SHADOWSOCKS_CONNECTOR_H
 #define _NET_PROXY_SHADOWSOCKS_CONNECTOR_H
 
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "absl/random/random.h"
 #include "net/endpoint.h"
 #include "net/proxy/connector.h"
@@ -22,7 +27,7 @@ public:
     Connector &operator=(const Connector &) = delete;
 
     struct Config {
-        Endpoint endpoint;
+        std::vector<Endpoint> endpoints;
         const Method *method = &Method::aes_128_gcm();
         std::string password;
         size_t min_padding_length = 1;
@@ -60,7 +65,8 @@ private:
 
     any_io_executor executor_;
     proxy::Connector &base_connector_;
-    Endpoint endpoint_;
+    std::vector<Endpoint> endpoints_;
+    std::vector<Endpoint>::iterator endpoints_iter_;
     PreSharedKey pre_shared_key_;
     size_t min_padding_length_;
     size_t max_padding_length_;

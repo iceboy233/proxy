@@ -77,7 +77,11 @@ Connector::Connector(
       base_connector_(base_connector) {}
 
 bool Connector::init(const Config &config) {
-    endpoint_ = config.endpoint;
+    endpoints_ = config.endpoints;
+    if (endpoints_.empty()) {
+        return false;
+    }
+    endpoints_iter_ = endpoints_.begin();
     if (!pre_shared_key_.init(*config.method, config.password)) {
         return false;
     }
@@ -287,16 +291,20 @@ void Connector::TcpStream::connect(
         base_stream_ = std::move(stream);
         std::move(callback)({});
     };
-    if (connector_.endpoint_.address().is_v4()) {
+    const Endpoint &endpoint = *connector_.endpoints_iter_++;
+    if (connector_.endpoints_iter_ == connector_.endpoints_.end()) {
+        connector_.endpoints_iter_ = connector_.endpoints_.begin();
+    }
+    if (endpoint.address().is_v4()) {
         connector_.base_connector_.connect_tcp_v4(
-            connector_.endpoint_.address().to_v4(),
-            connector_.endpoint_.port(),
+            endpoint.address().to_v4(),
+            endpoint.port(),
             buffer(write_buffer.data(), write_buffer.size()),
             std::move(wrapped_callback));
     } else {
         connector_.base_connector_.connect_tcp_v6(
-            connector_.endpoint_.address().to_v6(),
-            connector_.endpoint_.port(),
+            endpoint.address().to_v6(),
+            endpoint.port(),
             buffer(write_buffer.data(), write_buffer.size()),
             std::move(wrapped_callback));
     }

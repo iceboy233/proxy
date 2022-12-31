@@ -11,7 +11,7 @@ namespace system {
 
 Connector::Connector(const any_io_executor &executor, const Options &options)
     : executor_(executor),
-      resolver_(executor_),
+      resolver_(executor_, *this, {}),
       timer_list_(executor_, options.timeout),
       tcp_no_delay_(options.tcp_no_delay) {}
 
@@ -45,15 +45,18 @@ void Connector::connect_tcp_host(
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    resolver_.async_resolve(
+    resolver_.resolve(
         host,
-        absl::StrCat(port),
-        [this, initial_data, callback = std::move(callback)](
-            std::error_code ec,
-            const tcp::resolver::results_type &endpoints) mutable {
+        [this, port, initial_data, callback = std::move(callback)](
+            std::error_code ec, const std::vector<address> &addresses) mutable {
         if (ec) {
             std::move(callback)(ec, nullptr);
             return;
+        }
+        std::vector<tcp::endpoint> endpoints;
+        endpoints.reserve(addresses.size());
+        for (const auto &address : addresses) {
+            endpoints.push_back(tcp::endpoint(address, port));
         }
         connect_tcp(endpoints, initial_data, std::move(callback));
     });

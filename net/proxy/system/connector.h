@@ -3,6 +3,7 @@
 
 #include <chrono>
 
+#include "net/proxy/ares/resolver.h"
 #include "net/proxy/connector.h"
 #include "net/proxy/system/tcp-socket-stream.h"
 #include "net/proxy/system/udp-socket-datagram.h"
@@ -63,7 +64,7 @@ private:
             std::error_code, std::unique_ptr<Stream>) &&> callback);
 
     any_io_executor executor_;
-    tcp::resolver resolver_;
+    ares::Resolver resolver_;
     TimerList timer_list_;
     bool tcp_no_delay_;
 };

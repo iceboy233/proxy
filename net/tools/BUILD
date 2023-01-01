@@ -1,4 +1,18 @@
 cc_binary(
+    name = "ares-resolve",
+    srcs = ["ares-resolve.cc"],
+    deps = [
+        "//net/proxy/ares:resolver",
+        "//net/proxy/system:connector",
+        "@com_google_absl//absl/types:span",
+        "@org_iceboy_trunk//base:logging",
+        "@org_iceboy_trunk//io:stream",
+        "@org_iceboy_trunk//io/posix:file",
+        "@org_iceboy_trunk//net:asio",
+    ],
+)
+
+cc_binary(
     name = "http-server",
     srcs = ["http-server.cc"],
     deps = [

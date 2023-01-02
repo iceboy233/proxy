@@ -44,16 +44,16 @@ std::unique_ptr<Connector> create_connector(
     absl::AnyInvocable<proxy::Connector *(std::string_view)> get_connector_func,
     const boost::property_tree::ptree &settings) {
     Connector::Config config;
-    for (auto iters = settings.equal_range("endpoint");
+    for (auto iters = settings.equal_range("server");
          iters.first != iters.second;
          ++iters.first) {
-        std::string endpoint_str = iters.first->second.get_value<std::string>();
-        auto endpoint = Endpoint::from_string(endpoint_str);
-        if (!endpoint) {
-            LOG(error) << "invalid endpoint: " << endpoint_str;
+        std::string server_str = iters.first->second.get_value<std::string>();
+        auto server_endpoint = Endpoint::from_string(server_str);
+        if (!server_endpoint) {
+            LOG(error) << "invalid server endpoint: " << server_str;
             continue;
         }
-        config.endpoints.push_back(*endpoint);
+        config.endpoints.push_back(*server_endpoint);
     }
     std::string method = settings.get<std::string>("method", "");
     config.method = Method::find(method);

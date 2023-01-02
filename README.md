@@ -35,7 +35,7 @@ miracle-proxy --config miracle.conf
 ```
 listeners {
     "" {
-        endpoint 127.0.0.1:1080
+        listen 127.0.0.1:1080
         type socks
     }
 }
@@ -46,7 +46,7 @@ listeners {
 ```
 listeners {
     "" {
-        endpoint 0.0.0.0:8388
+        listen 0.0.0.0:8388
         type shadowsocks
         method 2022-blake3-aes-128-gcm
         password AAAAAAAAAAAAAAAAAAAAAA
@@ -59,7 +59,7 @@ listeners {
 ```
 listeners {
     "" {
-        endpoint 127.0.0.1:1080
+        listen 127.0.0.1:1080
         type socks
         connector proxy
     }
@@ -67,7 +67,7 @@ listeners {
 connectors {
     proxy {
         type shadowsocks
-        endpoint 1.2.3.4:8388
+        server 1.2.3.4:8388
         method 2022-blake3-aes-128-gcm
         password AAAAAAAAAAAAAAAAAAAAAA
     }

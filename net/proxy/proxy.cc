@@ -24,11 +24,10 @@ void Proxy::load_config(const boost::property_tree::ptree &config) {
     }
     for (const auto &pair : listeners_config) {
         const auto &listener_config = pair.second;
-        std::string endpoint_str = listener_config.get<std::string>(
-            "endpoint", "");
-        auto endpoint = Endpoint::from_string(endpoint_str);
-        if (!endpoint) {
-            LOG(error) << "invalid endpoint: " << endpoint_str;
+        std::string listen_str = listener_config.get<std::string>("listen", "");
+        auto listen_endpoint = Endpoint::from_string(listen_str);
+        if (!listen_endpoint) {
+            LOG(error) << "invalid listen endpoint: " << listen_str;
             continue;
         }
         auto handler = Registry::instance().create_handler(
@@ -48,7 +47,7 @@ void Proxy::load_config(const boost::property_tree::ptree &config) {
             listener_config.get<double>("timeout", 300) * 1000000000));
         options.tcp_no_delay = listener_config.get<bool>("tcp_no_delay", true);
         listeners_.push_back(std::make_unique<system::Listener>(
-            executor_, *endpoint, handler_ref, options));
+            executor_, *listen_endpoint, handler_ref, options));
     }
 }
 

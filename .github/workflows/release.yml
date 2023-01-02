@@ -1,0 +1,26 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install bazel
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/bin/"
+          curl -fLo "${GITHUB_WORKSPACE}/bin/bazel" "https://github.com/bazelbuild/bazel/releases/download/5.4.0/bazel-5.4.0-linux-x86_64"
+          chmod +x "${GITHUB_WORKSPACE}/bin/bazel"
+      - name: Build
+        run: |
+          "${GITHUB_WORKSPACE}/bin/bazel" build -c opt net/tools:miracle-proxy
+          ln bazel-bin/net/tools/miracle-proxy miracle-proxy-linux-amd64
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            miracle-proxy-linux-amd64

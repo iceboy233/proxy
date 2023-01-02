@@ -1,13 +1,14 @@
 # Miracle Proxy
 
-Miracle Proxy is a config-based proxy that supports multiple protocols and
-allows combinations.
+Miracle Proxy is a config-based, composable, multi-protocol proxy.
+
+[![Actions Status](https://github.com/iceboy233/proxy/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/iceboy233/proxy/actions/workflows/test.yml)
 
 ## Usage
 
 ### Getting the binaries
 
-TODO
+[Releases](https://github.com/iceboy233/proxy/releases)
 
 ### Build from source
 

@@ -12,6 +12,7 @@
 #include "net/asio.h"
 #include "net/proxy/ares/socket.h"
 #include "net/proxy/connector.h"
+#include "net/timer-list.h"
 #include "util/int-allocator.h"
 
 namespace net {
@@ -21,7 +22,8 @@ namespace ares {
 class Resolver {
 public:
     struct Options {
-        std::chrono::milliseconds timeout = std::chrono::seconds(1);
+        std::chrono::milliseconds query_timeout = std::chrono::seconds(1);
+        std::chrono::nanoseconds cache_timeout = std::chrono::minutes(1);
     };
 
     Resolver(
@@ -31,11 +33,13 @@ public:
     ~Resolver();
 
     using ResolveCallback =
-        absl::AnyInvocable<void(std::error_code, std::vector<address>) &&>;
+        absl::AnyInvocable<void(std::error_code,
+        const std::vector<address> &) &&>;
     void resolve(std::string_view host, ResolveCallback callback);
 
 private:
-    static void resolve_finish(void *arg, int status, int, ares_addrinfo *res);
+    class Operation;
+
     void wait();
 
     static ares_socket_t asocket(
@@ -56,6 +60,8 @@ private:
     proxy::Connector &connector_;
     ares_channel channel_ = nullptr;
     steady_timer wait_timer_;
+    TimerList cache_timer_list_;
+    absl::flat_hash_map<std::string, Operation *> operations_;
     absl::flat_hash_map<ares_socket_t, boost::intrusive_ptr<Socket>> sockets_;
     util::IntAllocator<ares_socket_t> socket_allocator_;
 };

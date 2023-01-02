@@ -9,6 +9,7 @@ cc_binary(
         "@org_iceboy_trunk//io:stream",
         "@org_iceboy_trunk//io/posix:file",
         "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:blocking-result",
     ],
 )
 

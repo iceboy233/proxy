@@ -12,6 +12,7 @@ cc_library(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/functional:any_invocable",
         "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:timer-list",
     ],
 )
 

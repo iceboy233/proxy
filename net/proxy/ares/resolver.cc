@@ -2,11 +2,34 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace net {
 namespace proxy {
 namespace ares {
+
+class Resolver::Operation {
+public:
+    Operation(Resolver &resolver, std::string_view host);
+    ~Operation();
+
+    void add_callback(ResolveCallback callback);
+    void start();
+
+private:
+    static void finish(void *arg, int status, int, ares_addrinfo *ai);
+    void parse(int status, ares_addrinfo *ai);
+    void cache();
+
+    Resolver &resolver_;
+    std::string host_;
+    std::vector<ResolveCallback> callbacks_;
+    bool finished_ = false;
+    std::error_code ec_;
+    std::vector<address> addresses_;
+    std::optional<TimerList::Timer> timer_;
+};
 
 const ares_socket_functions Resolver::funcs_ =
     {asocket, aclose, aconnect, arecvfrom, asendv};
@@ -17,9 +40,10 @@ Resolver::Resolver(
     const Options &options)
     : executor_(executor),
       connector_(connector),
-      wait_timer_(executor_) {
+      wait_timer_(executor_),
+      cache_timer_list_(executor_, options.cache_timeout) {
     ares_options ares_options;
-    ares_options.timeout = options.timeout.count();
+    ares_options.timeout = options.query_timeout.count();
     if (ares_init_options(&channel_, &ares_options, ARES_OPT_TIMEOUTMS) !=
         ARES_SUCCESS) {
         abort();
@@ -31,50 +55,16 @@ Resolver::~Resolver() {
     ares_destroy(channel_);
 }
 
-struct ResolveOperation {
-    Resolver &resolver;
-    Resolver::ResolveCallback callback;
-};
-
 void Resolver::resolve(std::string_view host, ResolveCallback callback) {
-    auto *operation = new ResolveOperation{*this, std::move(callback)};
-    ares_getaddrinfo(
-        channel_, std::string(host).c_str(), nullptr, nullptr,
-        resolve_finish, operation);
-    wait();
-}
-
-void Resolver::resolve_finish(void *arg, int status, int, ares_addrinfo *res) {
-    std::unique_ptr<ResolveOperation> operation(
-        reinterpret_cast<ResolveOperation *>(arg));
-    auto &resolver = operation->resolver;
-    post(resolver.executor_, [&resolver]() { resolver.wait(); });
-    if (status) {
-        std::move(operation->callback)(
-            make_error_code(std::errc::bad_address), {});
-        ares_freeaddrinfo(res);
+    auto iter = operations_.find(host);
+    if (iter != operations_.end()) {
+        iter->second->add_callback(std::move(callback));
         return;
     }
-    std::vector<address> addresses;
-    for (ares_addrinfo_node *node = res->nodes; node; node = node->ai_next) {
-        if (node->ai_family == AF_INET) {
-            if (node->ai_addrlen < sizeof(sockaddr_in)) {
-                continue;
-            }
-            auto *addr4 = reinterpret_cast<sockaddr_in *>(node->ai_addr);
-            addresses.push_back(address_v4(ntohl(addr4->sin_addr.s_addr)));
-        } else if (node->ai_family == AF_INET6) {
-            if (node->ai_addrlen < sizeof(sockaddr_in6)) {
-                continue;
-            }
-            auto *addr6 = reinterpret_cast<sockaddr_in6 *>(node->ai_addr);
-            address_v6::bytes_type bytes;
-            memcpy(bytes.data(), addr6->sin6_addr.s6_addr, 16);
-            addresses.push_back(address_v6(bytes));
-        }
-    }
-    ares_freeaddrinfo(res);
-    std::move(operation->callback)({}, std::move(addresses));
+    auto *operation = new Operation(*this, host);
+    operation->add_callback(std::move(callback));
+    operation->start();
+    wait();
 }
 
 void Resolver::wait() {
@@ -160,6 +150,73 @@ ares_ssize_t Resolver::asendv(
         return -1;
     }
     return iter->second->sendv(data, len);
+}
+
+Resolver::Operation::Operation(Resolver &resolver, std::string_view host)
+    : resolver_(resolver), host_(host) {
+    resolver_.operations_.emplace(host_, this);
+}
+
+Resolver::Operation::~Operation() {
+    resolver_.operations_.erase(host_);
+    if (resolver_.operations_.empty()) {
+        resolver_.wait_timer_.cancel();
+    }
+}
+
+void Resolver::Operation::add_callback(ResolveCallback callback) {
+    if (finished_) {
+        std::move(callback)(ec_, addresses_);
+        return;
+    }
+    callbacks_.push_back(std::move(callback));
+}
+
+void Resolver::Operation::start() {
+    ares_getaddrinfo(
+        resolver_.channel_, host_.c_str(), nullptr, nullptr, finish, this);
+}
+
+void Resolver::Operation::finish(
+    void *arg, int status, int, ares_addrinfo *ai) {
+    auto *operation = reinterpret_cast<Operation *>(arg);
+    operation->finished_ = true;
+    operation->parse(status, ai);
+    ares_freeaddrinfo(ai);
+    auto callbacks = std::move(operation->callbacks_);
+    operation->callbacks_.clear();
+    for (auto &callback : callbacks) {
+        std::move(callback)(operation->ec_, operation->addresses_);
+    }
+    operation->cache();
+}
+
+void Resolver::Operation::parse(int status, ares_addrinfo *ai) {
+    if (status != ARES_SUCCESS) {
+        ec_ = make_error_code(std::errc::bad_address);
+        return;
+    }
+    for (ares_addrinfo_node *node = ai->nodes; node; node = node->ai_next) {
+        if (node->ai_family == AF_INET) {
+            if (node->ai_addrlen < sizeof(sockaddr_in)) {
+                continue;
+            }
+            auto *addr4 = reinterpret_cast<sockaddr_in *>(node->ai_addr);
+            addresses_.push_back(address_v4(ntohl(addr4->sin_addr.s_addr)));
+        } else if (node->ai_family == AF_INET6) {
+            if (node->ai_addrlen < sizeof(sockaddr_in6)) {
+                continue;
+            }
+            auto *addr6 = reinterpret_cast<sockaddr_in6 *>(node->ai_addr);
+            address_v6::bytes_type bytes;
+            memcpy(bytes.data(), addr6->sin6_addr.s6_addr, 16);
+            addresses_.push_back(address_v6(bytes));
+        }
+    }
+}
+
+void Resolver::Operation::cache() {
+    timer_.emplace(resolver_.cache_timer_list_, [this]() { delete this; });
 }
 
 }  // namespace ares

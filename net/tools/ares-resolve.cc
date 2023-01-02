@@ -1,3 +1,4 @@
+#include <memory>
 #include <ostream>
 #include <string_view>
 #include <system_error>
@@ -7,6 +8,7 @@
 #include "io/posix/file.h"
 #include "io/stream.h"
 #include "net/asio.h"
+#include "net/blocking-result.h"
 #include "net/proxy/ares/resolver.h"
 #include "net/proxy/system/connector.h"
 
@@ -19,23 +21,25 @@ int main(int argc, char *argv[]) {
     auto executor = io_context.get_executor();
     proxy::system::Connector connector(executor, {});
     proxy::ares::Resolver resolver(executor, connector, {});
+
+    using Result = BlockingResult<std::error_code, std::vector<address>>;
+    auto results = std::make_unique<Result[]>(argc - 1);
+    for (int i = 1; i < argc; ++i) {
+        resolver.resolve(argv[i], results[i - 1].callback());
+    }
+
     io::OStream os(io::posix::stdout);
     for (int i = 1; i < argc; ++i) {
-        std::string_view host = argv[i];
-        resolver.resolve(
-            host,
-            [&os, host](
-                std::error_code ec, absl::Span<address const> addresses) {
-                if (ec) {
-                    LOG(error) << "resolve failed: " << ec;
-                    return;
-                }
-                os << host;
-                for (const address &address : addresses) {
-                    os << ' ' << address;
-                }
-                os << std::endl;
-            });
+        auto &result = results[i - 1];
+        result.run(io_context);
+        if (std::get<0>(result.args())) {
+            LOG(error) << "resolve failed: " << std::get<0>(result.args());
+            continue;
+        }
+        os << argv[i];
+        for (const address &address : std::get<1>(result.args())) {
+            os << ' ' << address;
+        }
+        os << std::endl;
     }
-    io_context.run();
 }

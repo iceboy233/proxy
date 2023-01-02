@@ -1,10 +1,18 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
+    name = "error-category",
+    srcs = ["error-category.cc"],
+    hdrs = ["error-category.h"],
+    deps = ["//third_party/cares"],
+)
+
+cc_library(
     name = "resolver",
     srcs = ["resolver.cc"],
     hdrs = ["resolver.h"],
     deps = [
+        ":error-category",
         ":socket",
         "//net/proxy:interface",
         "//third_party/cares",

@@ -5,6 +5,8 @@
 #include <optional>
 #include <string>
 
+#include "net/proxy/ares/error-category.h"
+
 namespace net {
 namespace proxy {
 namespace ares {
@@ -193,7 +195,7 @@ void Resolver::Operation::finish(
 
 void Resolver::Operation::parse(int status, ares_addrinfo *ai) {
     if (status != ARES_SUCCESS) {
-        ec_ = make_error_code(std::errc::bad_address);
+        ec_ = std::error_code(status, error_category());
         return;
     }
     for (ares_addrinfo_node *node = ai->nodes; node; node = node->ai_next) {

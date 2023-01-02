@@ -16,18 +16,6 @@ git_repository(
     remote = "https://github.com/google/boringssl.git",
 )
 
-git_repository(
-    name = "com_github_google_benchmark",
-    commit = "0d98dba29d66e93259db7daa53a9327df767a415",
-    remote = "https://github.com/google/benchmark.git",
-)
-
-git_repository(
-    name = "com_github_google_flatbuffers",
-    commit = "a9a295fecf3fbd5a4f571f53b01f63202a3e2113",
-    remote = "https://github.com/google/flatbuffers.git",
-)
-
 http_archive(
     name = "com_google_absl",
     sha256 = "54707f411cb62a26a776dad5fd60829098c181700edcd022ea5c2ca49e9b7ef1",

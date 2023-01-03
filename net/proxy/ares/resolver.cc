@@ -190,9 +190,11 @@ void Resolver::Operation::finish(
     for (auto &callback : callbacks) {
         std::move(callback)(operation->ec_, operation->addresses_);
     }
-    if (!operation->ec_) {
-        operation->cache();
+    if (operation->ec_) {
+        delete operation;
+        return;
     }
+    operation->cache();
 }
 
 void Resolver::Operation::parse(int status, ares_addrinfo *ai) {

@@ -18,9 +18,9 @@ jobs:
       - name: Build
         run: |
           "${GITHUB_WORKSPACE}/bin/bazel" build -c opt net/tools:miracle-proxy
-          ln bazel-bin/net/tools/miracle-proxy miracle-proxy-linux-amd64
+          ln bazel-bin/net/tools/miracle-proxy miracle-proxy-${GITHUB_REF_NAME}-linux-amd64
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            miracle-proxy-linux-amd64
+            miracle-proxy-v*.*.*-linux-amd64

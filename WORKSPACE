@@ -41,18 +41,6 @@ boost_deps()
 
 git_repository(
     name = "org_iceboy_trunk",
-    commit = "d1d2665a3308ab50b460b6a14483a91c16f3c3e6",
+    commit = "d15780f227aba09dafd471a9855beeb47e21e070",
     remote = "https://github.com/iceboy233/trunk.git",
 )
-
-http_archive(
-    name = "murtis_bazel_compilers",
-    urls = [
-        "https://github.com/curtismuntz/bazel_compilers/archive/e7c3ee9820bfde7f7284bbc3a9540293741719cd.tar.gz",
-    ],
-    strip_prefix = "bazel_compilers-e7c3ee9820bfde7f7284bbc3a9540293741719cd",
-)
-
-load("@murtis_bazel_compilers//compilers:dependencies.bzl", "cross_compiler_dependencies")
-
-cross_compiler_dependencies()

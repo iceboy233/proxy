@@ -33,8 +33,8 @@ public:
     ~Resolver();
 
     using ResolveCallback =
-        absl::AnyInvocable<void(std::error_code,
-        const std::vector<address> &) &&>;
+        absl::AnyInvocable<void(
+            std::error_code, const std::vector<address> &) &&>;
     void resolve(std::string_view host, ResolveCallback callback);
 
 private:

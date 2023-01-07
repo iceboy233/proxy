@@ -27,7 +27,7 @@ public:
     void async_write_some(
         absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
-    
+
     using Stream::async_read_some;
     using Stream::async_write_some;
 

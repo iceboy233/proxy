@@ -50,7 +50,7 @@ Resolver::Resolver(
         ARES_SUCCESS) {
         abort();
     }
-    ares_set_socket_functions(channel_, &funcs_, this);    
+    ares_set_socket_functions(channel_, &funcs_, this);
 }
 
 Resolver::~Resolver() {

@@ -1,4 +1,4 @@
-#include "net/proxy/echo/handler.h"
+#include "net/proxy/misc/null-handler.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -9,7 +9,7 @@
 
 namespace net {
 namespace proxy {
-namespace echo {
+namespace misc {
 namespace {
 
 class StreamConnection {
@@ -20,12 +20,10 @@ public:
 
 private:
     void read();
-    void write();
     void finish() { delete this; }
 
     std::unique_ptr<Stream> stream_;
     absl::FixedArray<uint8_t, 0> buffer_;
-    size_t size_;
 };
 
 StreamConnection::StreamConnection(std::unique_ptr<Stream> stream)
@@ -35,20 +33,6 @@ StreamConnection::StreamConnection(std::unique_ptr<Stream> stream)
 void StreamConnection::read() {
     stream_->async_read_some(
         buffer(buffer_.data(), buffer_.size()),
-        [this](std::error_code ec, size_t size) {
-            if (ec) {
-                finish();
-                return;
-            }
-            size_ = size;
-            write();
-        });
-}
-
-void StreamConnection::write() {
-    async_write(
-        *stream_,
-        buffer(buffer_.data(), size_),
         [this](std::error_code ec, size_t) {
             if (ec) {
                 finish();
@@ -60,11 +44,11 @@ void StreamConnection::write() {
 
 }  // namespace
 
-void Handler::handle_stream(std::unique_ptr<Stream> stream) {
+void NullHandler::handle_stream(std::unique_ptr<Stream> stream) {
     auto *connection = new StreamConnection(std::move(stream));
     connection->start();
 }
 
-}  // namespace echo
+}  // namespace misc
 }  // namespace proxy
 }  // namespace net

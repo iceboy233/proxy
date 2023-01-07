@@ -18,7 +18,7 @@ cc_binary(
     srcs = ["miracle-proxy.cc"],
     deps = [
         "//net/proxy",
-        "//net/proxy/echo:config",
+        "//net/proxy/misc:config",
         "//net/proxy/shadowsocks:config",
         "//net/proxy/socks:config",
         "//net/proxy/system:config",

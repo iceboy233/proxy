@@ -15,11 +15,10 @@ jobs:
         with:
           key: test-bazel-ubuntu-20.04
           path: ~/.cache/bazel
-      - name: Install bazel
+      - name: Install tools
         run: |
-          mkdir -p "${GITHUB_WORKSPACE}/bin/"
-          curl -fLo "${GITHUB_WORKSPACE}/bin/bazel" "https://github.com/bazelbuild/bazel/releases/download/5.4.0/bazel-5.4.0-linux-x86_64"
-          chmod +x "${GITHUB_WORKSPACE}/bin/bazel"
+          sudo curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/5.4.0/bazel-5.4.0-linux-x86_64"
+          sudo chmod +x /usr/local/bin/bazel
       - name: Test
         run: |
-          "${GITHUB_WORKSPACE}/bin/bazel" test -c opt ...
+          bazel test -c opt ...

@@ -6,21 +6,39 @@ on:
       - "v*.*.*"
 
 jobs:
-  build:
+  build-linux-amd64:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
-      - name: Install bazel
+      - name: Install tools
         run: |
-          mkdir -p "${GITHUB_WORKSPACE}/bin/"
-          curl -fLo "${GITHUB_WORKSPACE}/bin/bazel" "https://github.com/bazelbuild/bazel/releases/download/5.4.0/bazel-5.4.0-linux-x86_64"
-          chmod +x "${GITHUB_WORKSPACE}/bin/bazel"
+          sudo curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/5.4.0/bazel-5.4.0-linux-x86_64"
+          sudo chmod +x /usr/local/bin/bazel
       - name: Build
         run: |
-          "${GITHUB_WORKSPACE}/bin/bazel" build -c opt net/tools:miracle-proxy
+          bazel build -c opt net/tools:miracle-proxy
           ln bazel-bin/net/tools/miracle-proxy miracle-proxy-${GITHUB_REF_NAME}-linux-amd64
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             miracle-proxy-v*.*.*-linux-amd64
+
+  build-linux-arm64:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install tools
+        run: |
+          sudo apt-get install crossbuild-essential-arm64 -y
+          sudo curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/5.4.0/bazel-5.4.0-linux-x86_64"
+          sudo chmod +x /usr/local/bin/bazel
+      - name: Build
+        run: |
+          bazel build -c opt --cpu=aarch64 --crosstool_top=//tools/bazel:toolchain net/tools:miracle-proxy
+          ln bazel-bin/net/tools/miracle-proxy miracle-proxy-${GITHUB_REF_NAME}-linux-arm64
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            miracle-proxy-v*.*.*-linux-arm64

@@ -26,7 +26,7 @@ public:
     Connector(const Connector &) = delete;
     Connector &operator=(const Connector &) = delete;
 
-    struct Config {
+    struct InitOptions {
         std::vector<Endpoint> endpoints;
         const Method *method = &Method::aes_128_gcm();
         std::string password;
@@ -34,7 +34,7 @@ public:
         size_t max_padding_length = 900;
     };
 
-    bool init(const Config &config);
+    bool init(const InitOptions &options);
 
     void connect_tcp_v4(
         const address_v4 &address,

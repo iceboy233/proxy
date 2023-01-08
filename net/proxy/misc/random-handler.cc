@@ -25,6 +25,7 @@ public:
 private:
     void read();
     void write();
+    void close() { stream_.reset(); }
 
     std::unique_ptr<Stream> stream_;
     absl::FixedArray<uint8_t, 0> read_buffer_;
@@ -34,7 +35,9 @@ private:
 StreamConnection::StreamConnection(std::unique_ptr<Stream> stream)
     : stream_(std::move(stream)),
       read_buffer_(8192),
-      write_buffer_(8192) {}
+      write_buffer_(8192) {
+    RAND_bytes(write_buffer_.data(), write_buffer_.size());
+}
 
 void StreamConnection::read() {
     if (!stream_) {
@@ -45,7 +48,7 @@ void StreamConnection::read() {
         [connection = boost::intrusive_ptr<StreamConnection>(this)](
             std::error_code ec, size_t) {
             if (ec) {
-                connection->stream_.reset();
+                connection->close();
                 return;
             }
             connection->read();
@@ -56,15 +59,15 @@ void StreamConnection::write() {
     if (!stream_) {
         return;
     }
-    RAND_bytes(write_buffer_.data(), write_buffer_.size());
     stream_->async_write_some(
         const_buffer(write_buffer_.data(), write_buffer_.size()),
         [connection = boost::intrusive_ptr<StreamConnection>(this)](
-            std::error_code ec, size_t) {
+            std::error_code ec, size_t size) {
             if (ec) {
-                connection->stream_.reset();
+                connection->close();
                 return;
             }
+            RAND_bytes(connection->write_buffer_.data(), size);
             connection->write();
         });
 }

@@ -20,59 +20,45 @@ class Registry {
 public:
     static Registry &instance();
 
-    using HandlerCreateFunc = absl::AnyInvocable<std::unique_ptr<Handler>(
-        const any_io_executor &executor,
-        absl::AnyInvocable<Connector *(std::string_view)> get_connector_func,
-        const boost::property_tree::ptree &settings)>;
+    using CreateHandlerFunc = absl::AnyInvocable<std::unique_ptr<Handler>(
+        Proxy &proxy, const boost::property_tree::ptree &config)>;
 
-    void register_handler_type(
-        std::string_view type,
-        HandlerCreateFunc create_func);
+    void register_handler(std::string_view type, CreateHandlerFunc func);
 
     std::unique_ptr<Handler> create_handler(
-        std::string_view type,
-        const any_io_executor &executor,
-        absl::AnyInvocable<Connector *(std::string_view)> get_connector_func,
-        const boost::property_tree::ptree &settings);
+        Proxy &proxy, const boost::property_tree::ptree &config);
 
-    using ConnectorCreateFunc = absl::AnyInvocable<std::unique_ptr<Connector>(
-        const any_io_executor &executor,
-        absl::AnyInvocable<Connector *(std::string_view)> get_connector_func,
-        const boost::property_tree::ptree &settings)>;
+    using CreateConnectorFunc = absl::AnyInvocable<std::unique_ptr<Connector>(
+        Proxy &proxy, const boost::property_tree::ptree &config)>;
 
-    void register_connector_type(
-        std::string_view type,
-        ConnectorCreateFunc create_func);
+    void register_connector(std::string_view type, CreateConnectorFunc func);
 
     std::unique_ptr<Connector> create_connector(
-        std::string_view type,
-        const any_io_executor &executor,
-        absl::AnyInvocable<Connector *(std::string_view)> get_connector_func,
-        const boost::property_tree::ptree &settings);
+        Proxy &proxy, const boost::property_tree::ptree &config);
 
 private:
     Registry() = default;
 
-    absl::flat_hash_map<std::string, HandlerCreateFunc> handler_types_;
-    absl::flat_hash_map<std::string, ConnectorCreateFunc> connector_types_;
+    absl::flat_hash_map<std::string, CreateHandlerFunc> handlers_;
+    absl::flat_hash_map<std::string, CreateConnectorFunc> connectors_;
 };
 
 }  // namespace proxy
 }  // namespace net
 
-#define REGISTER_HANDLER_TYPE(_type, _create_func) \
+#define REGISTER_HANDLER(_type, _create_func) \
     namespace { \
-    auto register_handler_type##_create_func = []() { \
-        net::proxy::Registry::instance().register_handler_type( \
+    auto register_handler_##_type = []() { \
+        net::proxy::Registry::instance().register_handler( \
             #_type, _create_func); \
         return 0; \
     }(); \
     } \
 
-#define REGISTER_CONNECTOR_TYPE(_type, _create_func) \
+#define REGISTER_CONNECTOR(_type, _create_func) \
     namespace { \
-    auto register_connector_type##_create_func = []() { \
-        net::proxy::Registry::instance().register_connector_type( \
+    auto register_connector_##_type = []() { \
+        net::proxy::Registry::instance().register_connector( \
             #_type, _create_func); \
         return 0; \
     }(); \

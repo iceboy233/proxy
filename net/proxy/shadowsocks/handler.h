@@ -17,12 +17,12 @@ public:
         const any_io_executor &executor,
         proxy::Connector &connector);
 
-    struct Config {
+    struct InitOptions {
         const Method *method = &Method::aes_128_gcm();
         std::string password;
     };
 
-    bool init(const Config &config);
+    bool init(const InitOptions &config);
 
     void handle_stream(std::unique_ptr<Stream> stream) override;
 

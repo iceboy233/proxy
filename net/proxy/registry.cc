@@ -14,48 +14,43 @@ Registry &Registry::instance() {
     return registry;
 }
 
-void Registry::register_handler_type(
-    std::string_view type, HandlerCreateFunc create_func) {
-    if (handler_types_.contains(type)) {
-        LOG(fatal) << "multiple handler type " << type;
+void Registry::register_handler(std::string_view type, CreateHandlerFunc func) {
+    if (handlers_.contains(type)) {
+        LOG(fatal) << "duplicate handler type " << type;
         abort();
         return;
     }
-    handler_types_[type] = std::move(create_func);
+    handlers_[type] = std::move(func);
 }
 
 std::unique_ptr<Handler> Registry::create_handler(
-    std::string_view type,
-    const any_io_executor &executor,
-    absl::AnyInvocable<Connector *(std::string_view)> get_connector_func,
-    const boost::property_tree::ptree &settings) {
-    auto iter = handler_types_.find(type);
-    if (iter == handler_types_.end()) {
+    Proxy &proxy, const boost::property_tree::ptree &config) {
+    auto type = config.get<std::string>("type", "");
+    auto iter = handlers_.find(type);
+    if (iter == handlers_.end()) {
         return nullptr;
     }
-    return iter->second(executor, std::move(get_connector_func), settings);
+    return iter->second(proxy, config);
 }
 
-void Registry::register_connector_type(
-    std::string_view type, ConnectorCreateFunc create_func) {
-    if (connector_types_.contains(type)) {
-        LOG(fatal) << "multiple connector type " << type;
+void Registry::register_connector(
+    std::string_view type, CreateConnectorFunc func) {
+    if (connectors_.contains(type)) {
+        LOG(fatal) << "duplicate connector type " << type;
         abort();
         return;
     }
-    connector_types_[type] = std::move(create_func);
+    connectors_[type] = std::move(func);
 }
 
 std::unique_ptr<Connector> Registry::create_connector(
-    std::string_view type,
-    const any_io_executor &executor,
-    absl::AnyInvocable<Connector *(std::string_view)> get_connector_func,
-    const boost::property_tree::ptree &settings) {
-    auto iter = connector_types_.find(type);
-    if (iter == connector_types_.end()) {
+    Proxy &proxy, const boost::property_tree::ptree &config) {
+    auto type = config.get<std::string>("type", "");
+    auto iter = connectors_.find(type);
+    if (iter == connectors_.end()) {
         return nullptr;
     }
-    return iter->second(executor, std::move(get_connector_func), settings);
+    return iter->second(proxy, config);
 }
 
 }  // namespace proxy

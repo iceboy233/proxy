@@ -5,10 +5,8 @@ cc_library(
     srcs = ["config.cc"],
     deps = [
         ":handler",
-        "//net/proxy:registry",
-        "@com_google_absl//absl/functional:any_invocable",
+        "//net/proxy",
         "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//net:asio",
         "@org_boost_boost//:property_tree",
     ],
     alwayslink = 1,

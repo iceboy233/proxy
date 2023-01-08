@@ -76,17 +76,17 @@ Connector::Connector(
     : executor_(executor),
       base_connector_(base_connector) {}
 
-bool Connector::init(const Config &config) {
-    endpoints_ = config.endpoints;
+bool Connector::init(const InitOptions &options) {
+    endpoints_ = options.endpoints;
     if (endpoints_.empty()) {
         return false;
     }
     endpoints_iter_ = endpoints_.begin();
-    if (!pre_shared_key_.init(*config.method, config.password)) {
+    if (!pre_shared_key_.init(*options.method, options.password)) {
         return false;
     }
-    min_padding_length_ = config.min_padding_length;
-    max_padding_length_ = config.max_padding_length;
+    min_padding_length_ = options.min_padding_length;
+    max_padding_length_ = options.max_padding_length;
     return true;
 }
 

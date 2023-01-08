@@ -1,9 +1,8 @@
 #include <memory>
 #include <boost/property_tree/ptree.hpp>
 
-#include "absl/functional/any_invocable.h"
 #include "base/logging.h"
-#include "net/asio.h"
+#include "net/proxy/proxy.h"
 #include "net/proxy/registry.h"
 #include "net/proxy/shadowsocks/connector.h"
 #include "net/proxy/shadowsocks/handler.h"
@@ -13,38 +12,36 @@ namespace proxy {
 namespace shadowsocks {
 namespace {
 
-std::unique_ptr<Handler> create_handler(
-    const any_io_executor &executor,
-    absl::AnyInvocable<proxy::Connector *(std::string_view)> get_connector_func,
-    const boost::property_tree::ptree &settings) {
-    Handler::Config config;
-    std::string method = settings.get<std::string>("method", "");
-    config.method = Method::find(method);
-    if (!config.method) {
+REGISTER_HANDLER(shadowsocks, [](
+    Proxy &proxy,
+    const boost::property_tree::ptree &config) -> std::unique_ptr<Handler> {
+    Handler::InitOptions options;
+    std::string method = config.get<std::string>("method", "");
+    options.method = Method::find(method);
+    if (!options.method) {
         LOG(error) << "invalid method: " << method;
         return nullptr;
     }
-    config.password = settings.get<std::string>("password", "");
-    std::string connector_str = settings.get<std::string>("connector", "");
-    proxy::Connector *connector = get_connector_func(connector_str);
+    options.password = config.get<std::string>("password", "");
+    std::string connector_str = config.get<std::string>("connector", "");
+    proxy::Connector *connector = proxy.get_connector(connector_str);
     if (!connector) {
         LOG(error) << "invalid connector: " << connector_str;
         return nullptr;
     }
-    auto handler = std::make_unique<Handler>(executor, *connector);
-    if (!handler->init(config)) {
+    auto handler = std::make_unique<Handler>(proxy.executor(), *connector);
+    if (!handler->init(options)) {
         LOG(error) << "init failed";
         return nullptr;
     }
     return handler;
-}
+});
 
-std::unique_ptr<Connector> create_connector(
-    const any_io_executor &executor,
-    absl::AnyInvocable<proxy::Connector *(std::string_view)> get_connector_func,
-    const boost::property_tree::ptree &settings) {
-    Connector::Config config;
-    for (auto iters = settings.equal_range("server");
+REGISTER_CONNECTOR(shadowsocks, [](
+    Proxy &proxy,
+    const boost::property_tree::ptree &config) -> std::unique_ptr<Connector> {
+    Connector::InitOptions options;
+    for (auto iters = config.equal_range("server");
          iters.first != iters.second;
          ++iters.first) {
         std::string server_str = iters.first->second.get_value<std::string>();
@@ -53,33 +50,31 @@ std::unique_ptr<Connector> create_connector(
             LOG(error) << "invalid server endpoint: " << server_str;
             continue;
         }
-        config.endpoints.push_back(*server_endpoint);
+        options.endpoints.push_back(*server_endpoint);
     }
-    std::string method = settings.get<std::string>("method", "");
-    config.method = Method::find(method);
-    if (!config.method) {
+    std::string method = config.get<std::string>("method", "");
+    options.method = Method::find(method);
+    if (!options.method) {
         LOG(error) << "invalid method: " << method;
         return nullptr;
     }
-    config.password = settings.get<std::string>("password", "");
-    config.min_padding_length = settings.get<size_t>("min-padding-length", 1);
-    config.max_padding_length = settings.get<size_t>("max-padding-length", 900);
-    std::string connector_str = settings.get<std::string>("connector", "");
-    proxy::Connector *base_connector = get_connector_func(connector_str);
+    options.password = config.get<std::string>("password", "");
+    options.min_padding_length = config.get<size_t>("min-padding-length", 1);
+    options.max_padding_length = config.get<size_t>("max-padding-length", 900);
+    std::string connector_str = config.get<std::string>("connector", "");
+    proxy::Connector *base_connector = proxy.get_connector(connector_str);
     if (!base_connector) {
         LOG(error) << "invalid connector: " << connector_str;
         return nullptr;
     }
-    auto connector = std::make_unique<Connector>(executor, *base_connector);
-    if (!connector->init(config)) {
+    auto connector = std::make_unique<Connector>(
+        proxy.executor(), *base_connector);
+    if (!connector->init(options)) {
         LOG(error) << "init failed";
         return nullptr;
     }
     return connector;
-}
-
-REGISTER_HANDLER_TYPE(shadowsocks, create_handler);
-REGISTER_CONNECTOR_TYPE(shadowsocks, create_connector);
+});
 
 }  // namespace
 }  // namespace shadowsocks

@@ -61,8 +61,8 @@ Handler::Handler(
     proxy::Connector &connector)
     : connector_(connector) {}
 
-bool Handler::init(const Config &config) {
-    return pre_shared_key_.init(*config.method, config.password);
+bool Handler::init(const InitOptions &options) {
+    return pre_shared_key_.init(*options.method, options.password);
 }
 
 void Handler::handle_stream(std::unique_ptr<Stream> stream) {

@@ -24,6 +24,7 @@ public:
 private:
     void read();
     void write();
+    void close() { stream_.reset(); }
 
     std::unique_ptr<Stream> stream_;
     absl::FixedArray<uint8_t, 0> read_buffer_;
@@ -44,7 +45,7 @@ void StreamConnection::read() {
         [connection = boost::intrusive_ptr<StreamConnection>(this)](
             std::error_code ec, size_t) {
             if (ec) {
-                connection->stream_.reset();
+                connection->close();
                 return;
             }
             connection->read();
@@ -60,7 +61,7 @@ void StreamConnection::write() {
         [connection = boost::intrusive_ptr<StreamConnection>(this)](
             std::error_code ec, size_t) {
             if (ec) {
-                connection->stream_.reset();
+                connection->close();
                 return;
             }
             connection->write();

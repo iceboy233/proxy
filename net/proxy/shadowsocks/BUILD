@@ -6,11 +6,9 @@ cc_library(
     deps = [
         ":connector",
         ":handler",
-        "//net/proxy:registry",
-        "@com_google_absl//absl/functional:any_invocable",
+        "//net/proxy",
         "@org_boost_boost//:property_tree",
         "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//net:asio",
     ],
     alwayslink = 1,
 )

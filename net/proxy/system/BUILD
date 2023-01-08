@@ -5,8 +5,7 @@ cc_library(
     srcs = ["config.cc"],
     deps = [
         ":connector",
-        "//net/proxy:registry",
-        "@org_iceboy_trunk//net:asio",
+        "//net/proxy",
         "@org_boost_boost//:property_tree",
     ],
     alwayslink = 1,

@@ -21,13 +21,16 @@ public:
     Proxy(const any_io_executor &executor);
 
     void load_config(const boost::property_tree::ptree &config);
+    Connector *get_connector(std::string_view name);
+
+    const any_io_executor &executor() const { return executor_; }
 
 private:
-    Connector *get_connector(
-        const boost::property_tree::ptree &connectors_config,
-        std::string_view name);
+    void create_listeners();
 
     any_io_executor executor_;
+    boost::property_tree::ptree listeners_config_;
+    boost::property_tree::ptree connectors_config_;
     std::vector<std::unique_ptr<system::Listener>> listeners_;
     std::vector<std::unique_ptr<Handler>> handlers_;
     absl::flat_hash_map<std::string, std::unique_ptr<Connector>> connectors_;

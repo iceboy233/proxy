@@ -42,3 +42,17 @@ jobs:
         with:
           files: |
             miracle-proxy-v*.*.*-linux-arm64
+
+  build-windows-amd64:
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: |
+          bazel build -c opt net/tools:miracle-proxy
+          Copy-Item bazel-bin\net\tools\miracle-proxy.exe -Destination miracle-proxy-$Env:GITHUB_REF_NAME-windows-amd64.exe
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            miracle-proxy-v*.*.*-windows-amd64.exe

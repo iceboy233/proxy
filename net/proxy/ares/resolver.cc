@@ -44,6 +44,9 @@ Resolver::Resolver(
       connector_(connector),
       wait_timer_(executor_),
       cache_timer_list_(executor_, options.cache_timeout) {
+    if (ares_library_init(ARES_LIB_INIT_ALL) != ARES_SUCCESS) {
+        abort();
+    }
     ares_options ares_options;
     ares_options.timeout = options.query_timeout.count();
     if (ares_init_options(&channel_, &ares_options, ARES_OPT_TIMEOUTMS) !=
@@ -55,6 +58,7 @@ Resolver::Resolver(
 
 Resolver::~Resolver() {
     ares_destroy(channel_);
+    ares_library_cleanup();
 }
 
 void Resolver::resolve(std::string_view host, ResolveCallback callback) {

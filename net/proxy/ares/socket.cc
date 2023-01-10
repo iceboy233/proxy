@@ -2,6 +2,17 @@
 
 #include <utility>
 
+#ifdef _WIN32
+struct iovec {
+    void *iov_base;
+    size_t iov_len;
+};
+
+#define SET_ERRNO(x) WSASetLastError(WSA##x)
+#else
+#define SET_ERRNO(x) (errno = (x))
+#endif
+
 namespace net {
 namespace proxy {
 namespace ares {
@@ -75,8 +86,7 @@ int TcpSocket::connect(const sockaddr *addr, ares_socklen_t addr_len) {
     address address;
     uint16_t port;
     if (!parse_addr(addr, addr_len, address, port)) {
-        // TODO: support Windows.
-        errno = EINVAL;
+        SET_ERRNO(EINVAL);
         return -1;
     }
     auto callback = [socket = boost::intrusive_ptr<TcpSocket>(this)](
@@ -93,8 +103,7 @@ int TcpSocket::connect(const sockaddr *addr, ares_socklen_t addr_len) {
         connector_.connect_tcp_v6(
             address.to_v6(), port, {}, std::move(callback));
     }
-    // TODO: support Windows.
-    errno = EINPROGRESS;
+    SET_ERRNO(EINPROGRESS);
     return -1;
 }
 
@@ -114,11 +123,11 @@ ares_ssize_t TcpSocket::recvfrom(
         return read_size_;
     }
     if (!read_buffer_.empty()) {
-        errno = EWOULDBLOCK;
+        SET_ERRNO(EWOULDBLOCK);
         return -1;
     }
     if (!stream_) {
-        errno = ENETUNREACH;
+        SET_ERRNO(ENETUNREACH);
         return -1;
     }
     read_buffer_.resize(buf_size);
@@ -133,13 +142,13 @@ ares_ssize_t TcpSocket::recvfrom(
             socket->read_finished_ = true;
             ares_process_fd(socket->channel_, socket->fd_, ARES_SOCKET_BAD);
         });
-    errno = EWOULDBLOCK;
+    SET_ERRNO(EWOULDBLOCK);
     return -1;
 }
 
 ares_ssize_t TcpSocket::sendv(const iovec *data, int len) {
     if (!write_buffer_.empty()) {
-        errno = EWOULDBLOCK;
+        SET_ERRNO(EWOULDBLOCK);
         return -1;
     }
     for (const auto *p = data; p < data + len; ++p) {
@@ -148,7 +157,7 @@ ares_ssize_t TcpSocket::sendv(const iovec *data, int len) {
         memcpy(&write_buffer_[offset], p->iov_base, p->iov_len);
     }
     if (!stream_) {
-        errno = ENETUNREACH;
+        SET_ERRNO(ENETUNREACH);
         return -1;
     }
     async_write(
@@ -183,8 +192,7 @@ int UdpSocket::connect(const sockaddr *addr, ares_socklen_t addr_len) {
     address address;
     uint16_t port;
     if (!parse_addr(addr, addr_len, address, port)) {
-        // TODO: support Windows.
-        errno = EINVAL;
+        SET_ERRNO(EINVAL);
         return -1;
     }
     if (address.is_v4()) {
@@ -207,7 +215,7 @@ ares_ssize_t UdpSocket::recvfrom(
     void *buf, size_t buf_size, int flags,
     sockaddr *addr, ares_socklen_t *addr_len) {
     if (!datagram_) {
-        errno = ENETUNREACH;
+        SET_ERRNO(ENETUNREACH);
         return -1;
     }
     if (receive_finished_) {
@@ -226,7 +234,7 @@ ares_ssize_t UdpSocket::recvfrom(
         return receive_size_;
     }
     if (!receive_buffer_.empty()) {
-        errno = EWOULDBLOCK;
+        SET_ERRNO(EWOULDBLOCK);
         return -1;
     }
     receive_buffer_.resize(buf_size);
@@ -242,13 +250,13 @@ ares_ssize_t UdpSocket::recvfrom(
             socket->receive_finished_ = true;
             ares_process_fd(socket->channel_, socket->fd_, ARES_SOCKET_BAD);
         });
-    errno = EWOULDBLOCK;
+    SET_ERRNO(EWOULDBLOCK);
     return -1;
 }
 
 ares_ssize_t UdpSocket::sendv(const iovec *data, int len) {
     if (!datagram_) {
-        errno = ENETUNREACH;
+        SET_ERRNO(ENETUNREACH);
         return -1;
     }
     std::vector<uint8_t> buffer;
@@ -266,6 +274,9 @@ ares_ssize_t UdpSocket::sendv(const iovec *data, int len) {
 }
 
 void UdpSocket::send_next() {
+    if (!datagram_) {
+        return;
+    }
     datagram_->async_send_to(
         const_buffer(send_queue_.front().data(), send_queue_.front().size()),
         send_endpoint_,

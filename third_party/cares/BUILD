@@ -82,9 +82,16 @@ cc_library(
         "c-ares/src/lib/ares__close_sockets.c",
         "c-ares/src/lib/ares_process.c",
         "c-ares/src/lib/bitncmp.h",
-        "linux/ares_build.h",
-        "linux/ares_config.h",
-    ],
+    ] + select({
+        "@bazel_tools//src/conditions:linux": [
+            "linux/ares_build.h",
+            "linux/ares_config.h",
+        ],
+        "@bazel_tools//src/conditions:windows": [
+            "windows/ares_build.h",
+            "windows/ares_config.h",
+        ],
+    }),
     hdrs = [
         "c-ares/include/ares.h",
         "c-ares/include/ares_dns.h",
@@ -92,12 +99,15 @@ cc_library(
         "c-ares/include/ares_rules.h",
         "c-ares/include/ares_version.h",
     ],
-    includes = [
-        "c-ares/include",
-        "linux",
-    ],
+    includes = ["c-ares/include"] + select({
+        "@bazel_tools//src/conditions:linux": ["linux"],
+        "@bazel_tools//src/conditions:windows": ["windows"],
+    }),
     defines = [
         "CARES_STATICLIB",
         "HAVE_CONFIG_H",
+    ],
+    linkopts = [
+        "-DEFAULTLIB:iphlpapi.lib",
     ],
 )

@@ -36,6 +36,12 @@ all_link_actions = [
     ACTION_NAMES.cpp_link_nodeps_dynamic_library,
 ]
 
+lto_index_actions = [
+    ACTION_NAMES.lto_index_for_executable,
+    ACTION_NAMES.lto_index_for_dynamic_library,
+    ACTION_NAMES.lto_index_for_nodeps_dynamic_library,
+]
+
 def _impl(ctx):
     tool_paths = [
         tool_path(
@@ -96,13 +102,12 @@ def _impl(ctx):
         ],
     )
 
-
     default_link_flags_feature = feature(
         name = "default_link_flags",
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = all_link_actions, # + lto_index_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = ([
                     flag_group(
                         flags = ctx.attr.link_flags,
@@ -110,7 +115,7 @@ def _impl(ctx):
                 ] if ctx.attr.link_flags else []),
             ),
             flag_set(
-                actions = all_link_actions, # + lto_index_actions,
+                actions = all_link_actions + lto_index_actions,
                 flag_groups = ([
                     flag_group(
                         flags = ctx.attr.opt_link_flags,

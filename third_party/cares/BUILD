@@ -107,7 +107,8 @@ cc_library(
         "CARES_STATICLIB",
         "HAVE_CONFIG_H",
     ],
-    linkopts = [
-        "-DEFAULTLIB:iphlpapi.lib",
-    ],
+    linkopts = select({
+        "@bazel_tools//src/conditions:windows": ["-DEFAULTLIB:iphlpapi.lib"],
+        "//conditions:default": [],
+    }),
 )

@@ -2,6 +2,7 @@
 
 #include <openssl/evp.h>
 #include <openssl/hkdf.h>
+#include <string_view>
 
 #include "base/logging.h"
 #include "third_party/blake3/blake3.h"
@@ -19,31 +20,28 @@ SessionSubkey::~SessionSubkey() {
 }
 
 void SessionSubkey::init(
-    const PreSharedKey &pre_shared_key, const uint8_t *salt) {
-    memcpy(salt_.data(), salt, pre_shared_key.method().salt_size());
+    const PreSharedKey &psk, const uint8_t *salt) {
+    memcpy(salt_.data(), salt, psk.method().salt_size());
     std::array<uint8_t, 32> key;
-    if (pre_shared_key.method().is_spec_2022()) {
+    if (psk.method().is_spec_2022()) {
         blake3_hasher hasher;
-        blake3_hasher_init_derive_key_raw(
-            &hasher, "shadowsocks 2022 session subkey", 31);
-        blake3_hasher_update(
-            &hasher, pre_shared_key.data(), pre_shared_key.size());
-        blake3_hasher_update(
-            &hasher, salt_.data(), pre_shared_key.method().salt_size());
-        blake3_hasher_finalize(&hasher, key.data(), pre_shared_key.size());
+        constexpr std::string_view info = "shadowsocks 2022 session subkey";
+        blake3_hasher_init_derive_key_raw(&hasher, info.data(), info.size());
+        blake3_hasher_update(&hasher, psk.data(), psk.size());
+        blake3_hasher_update(&hasher, salt_.data(), psk.method().salt_size());
+        blake3_hasher_finalize(&hasher, key.data(), psk.size());
     } else {
+        constexpr std::string_view info = "ss-subkey";
         if (!HKDF(
-            key.data(), pre_shared_key.size(), EVP_sha1(),
-            pre_shared_key.data(), pre_shared_key.size(),
-            salt_.data(), pre_shared_key.method().salt_size(),
-            reinterpret_cast<const uint8_t *>("ss-subkey"), 9)) {
+            key.data(), psk.size(), EVP_sha1(), psk.data(), psk.size(),
+            salt_.data(), psk.method().salt_size(),
+            reinterpret_cast<const uint8_t *>(info.data()), info.size())) {
             LOG(fatal) << "HKDF failed";
             abort();
         }
     }
     if (!EVP_AEAD_CTX_init(
-        &aead_ctx_, pre_shared_key.method().aead_,
-        key.data(), pre_shared_key.size(), 16, nullptr)) {
+        &aead_ctx_, psk.method().aead_, key.data(), psk.size(), 16, nullptr)) {
         LOG(fatal) << "EVP_AEAD_CTX_init failed";
         abort();
     }

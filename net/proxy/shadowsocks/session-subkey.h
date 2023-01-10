@@ -21,7 +21,7 @@ public:
     SessionSubkey(const SessionSubkey &) = delete;
     SessionSubkey &operator=(const SessionSubkey &) = delete;
 
-    void init(const PreSharedKey &pre_shared_key, const uint8_t *salt);
+    void init(const PreSharedKey &psk, const uint8_t *salt);
 
     void encrypt(ConstBufferSpan in, uint8_t *out, uint8_t out_tag[16]);
     bool decrypt(ConstBufferSpan in, const uint8_t in_tag[16], uint8_t *out);

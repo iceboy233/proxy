@@ -12,7 +12,8 @@ http_archive(
 
 git_repository(
     name = "boringssl",
-    commit = "f9eff21461cf79556a0fb8ca9b1bf60c3b283ce8",
+    # chromium-107.0.5304.121 (linux/stable)
+    commit = "7b00d84b025dff0c392c2df5ee8aa6d3c63ad539",
     remote = "https://github.com/google/boringssl.git",
 )
 

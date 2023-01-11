@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install tools
         run: |
-          sudo curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/5.4.0/bazel-5.4.0-linux-x86_64"
+          sudo curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/6.0.0/bazel-6.0.0-linux-x86_64"
           sudo chmod +x /usr/local/bin/bazel
       - name: Build
         run: |
@@ -31,11 +31,11 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get install crossbuild-essential-arm64 -y
-          sudo curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/5.4.0/bazel-5.4.0-linux-x86_64"
+          sudo curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/6.0.0/bazel-6.0.0-linux-x86_64"
           sudo chmod +x /usr/local/bin/bazel
       - name: Build
         run: |
-          bazel build -c opt --cpu=aarch64 --crosstool_top=//tools/bazel:toolchain net/tools:miracle-proxy
+          bazel build -c opt --cpu=aarch64 --crosstool_top=//tools/bazel:toolchain --platforms=tools/bazel:linux-arm64 net/tools:miracle-proxy
           ln bazel-bin/net/tools/miracle-proxy miracle-proxy-${GITHUB_REF_NAME}-linux-arm64
       - name: Release
         uses: softprops/action-gh-release@v1

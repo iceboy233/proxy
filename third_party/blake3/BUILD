@@ -26,21 +26,26 @@ cc_library(
 )
 
 # TODO: Move this to a shared place.
-# TODO: Make CPU compatible with bazel platforms.
 config_setting(
     name = "linux_amd64",
-    values = {"cpu": "k8"},
-    constraint_values = ["@platforms//os:linux"],
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
 )
 
 config_setting(
     name = "linux_arm64",
-    values = {"cpu": "aarch64"},
-    constraint_values = ["@platforms//os:linux"],
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:linux",
+    ],
 )
 
 config_setting(
     name = "windows_amd64",
-    values = {"cpu": "x64_windows"},
-    constraint_values = ["@platforms//os:windows"],
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
 )

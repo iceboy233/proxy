@@ -85,3 +85,27 @@ cc_toolchain_config(
         "-Wl,--gc-sections",
     ],
 )
+
+platform(
+    name = "linux-arm64",
+    constraint_values = [
+       "@platforms//cpu:arm64",
+       "@platforms//os:linux",
+    ],
+)
+
+platform(
+    name = "linux-amd64",
+    constraint_values = [
+       "@platforms//cpu:x86_64",
+       "@platforms//os:linux",
+    ],
+)
+
+platform(
+    name = "windows-amd64",
+    constraint_values = [
+       "@platforms//cpu:x86_64",
+       "@platforms//os:windows",
+    ],
+)

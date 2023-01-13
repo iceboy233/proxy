@@ -31,6 +31,13 @@ http_archive(
     urls = ["https://github.com/google/googletest/archive/refs/tags/release-1.12.1.zip"],
 )
 
+http_archive(
+    name = "com_google_re2",
+    #sha256 = "54707f411cb62a26a776dad5fd60829098c181700edcd022ea5c2ca49e9b7ef1",
+    strip_prefix = "re2-d0b1f8f2ecc2ea74956c7608b6f915175314ff0e",
+    urls = ["https://github.com/google/re2/archive/d0b1f8f2ecc2ea74956c7608b6f915175314ff0e.zip"],
+)
+
 git_repository(
     name = "org_boost_boost",
     commit = "5d277ca0e165c4de02104bb976233cd6c6b7c75f",

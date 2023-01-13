@@ -10,11 +10,12 @@ http_archive(
     sha256 = "f7be3474d42aae265405a592bb7da8e171919d74c16f082a5457840f06054728",
 )
 
-git_repository(
+http_archive(
     name = "boringssl",
     # chromium-107.0.5304.121 (linux/stable)
-    commit = "7b00d84b025dff0c392c2df5ee8aa6d3c63ad539",
-    remote = "https://github.com/google/boringssl.git",
+    sha256 = "e52a66962f40132aaeb17f70218da57e3613e820feb4b15aa05396c1acf543f9",
+    strip_prefix = "boringssl-7b00d84b025dff0c392c2df5ee8aa6d3c63ad539",
+    urls = ["https://github.com/google/boringssl/archive/7b00d84b025dff0c392c2df5ee8aa6d3c63ad539.zip"],
 )
 
 http_archive(
@@ -33,7 +34,7 @@ http_archive(
 
 http_archive(
     name = "com_google_re2",
-    #sha256 = "54707f411cb62a26a776dad5fd60829098c181700edcd022ea5c2ca49e9b7ef1",
+    sha256 = "b9ce3a51beebb38534d11d40f8928d40509b9e18a735f6a4a97ad3d014c87cb5",
     strip_prefix = "re2-d0b1f8f2ecc2ea74956c7608b6f915175314ff0e",
     urls = ["https://github.com/google/re2/archive/d0b1f8f2ecc2ea74956c7608b6f915175314ff0e.zip"],
 )

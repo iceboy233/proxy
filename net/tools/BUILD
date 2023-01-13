@@ -19,6 +19,7 @@ cc_binary(
     deps = [
         "//net/proxy",
         "//net/proxy/misc:config",
+        "//net/proxy/route:config",
         "//net/proxy/shadowsocks:config",
         "//net/proxy/socks:config",
         "//net/proxy/system:config",

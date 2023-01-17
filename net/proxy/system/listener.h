@@ -17,6 +17,8 @@ public:
     struct Options {
         std::chrono::nanoseconds timeout = std::chrono::minutes(5);
         bool tcp_no_delay = true;
+        std::chrono::nanoseconds accept_error_delay =
+            std::chrono::milliseconds(500);
     };
 
     Listener(
@@ -27,12 +29,15 @@ public:
 
 private:
     void accept();
+    void accept_error_wait();
 
     any_io_executor executor_;
     tcp::acceptor tcp_acceptor_;
     Handler &handler_;
     TimerList timer_list_;
     bool tcp_no_delay_;
+    std::chrono::nanoseconds accept_error_delay_;
+    steady_timer accept_error_timer_;
 };
 
 }  // namespace system

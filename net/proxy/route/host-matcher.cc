@@ -10,20 +10,20 @@ namespace route {
 HostMatcher::HostMatcher()
     : set_({}, re2::RE2::ANCHOR_BOTH) {}
 
-int HostMatcher::add(std::string_view host) {
-    int ret = set_.Add(RE2::QuoteMeta(host), nullptr);
-    if (ret < 0) {
+void HostMatcher::add(std::string_view host, int value) {
+    if (set_.Add(RE2::QuoteMeta(host), nullptr) !=
+        static_cast<int>(values_.size())) {
         abort();
     }
-    return ret;
+    values_.push_back(value);
 }
 
-int HostMatcher::add_suffix(std::string_view suffix) {
-    int ret = set_.Add("(.*\\.)?" + RE2::QuoteMeta(suffix), nullptr);
-    if (ret < 0) {
+void HostMatcher::add_suffix(std::string_view suffix, int value) {
+    if (set_.Add("(.*\\.)?" + RE2::QuoteMeta(suffix), nullptr) !=
+        static_cast<int>(values_.size())) {
         abort();
     }
-    return ret;
+    values_.push_back(value);
 }
 
 void HostMatcher::build() {
@@ -32,12 +32,12 @@ void HostMatcher::build() {
     }
 }
 
-int HostMatcher::match(std::string_view host) {
+std::optional<int> HostMatcher::match(std::string_view host) {
     std::vector<int> v;
     if (!set_.Match(host, &v)) {
-        return -1;
+        return std::nullopt;
     }
-    return v.front();
+    return values_[v.front()];
 }
 
 }  // namespace route

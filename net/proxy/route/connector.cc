@@ -8,19 +8,12 @@ namespace route {
 
 Connector::Connector(absl::Span<Rule const> rules) {
     for (const Rule &rule : rules) {
+        connectors_.push_back(rule.connector);
         for (const std::string &host : rule.hosts) {
-            size_t index = host_matcher_.add(host);
-            if (index != connectors_.size()) {
-                abort();
-            }
-            connectors_.push_back(rule.connector);
+            host_matcher_.add(host, connectors_.size() - 1);
         }
         for (const std::string &host_suffix : rule.host_suffixes) {
-            size_t index = host_matcher_.add_suffix(host_suffix);
-            if (index != connectors_.size()) {
-                abort();
-            }
-            connectors_.push_back(rule.connector);
+            host_matcher_.add_suffix(host_suffix, connectors_.size() - 1);
         }
         if (rule.is_default && !default_connector_) {
             default_connector_ = rule.connector;
@@ -67,8 +60,8 @@ void Connector::connect_tcp_host(
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    int index = host_matcher_.match(host);
-    auto *connector = index >= 0 ? connectors_[index] : default_connector_;
+    std::optional<int> index = host_matcher_.match(host);
+    auto *connector = index ? connectors_[*index] : default_connector_;
     if (!connector) {
         std::move(callback)(
             make_error_code(std::errc::network_unreachable), nullptr);

@@ -9,33 +9,33 @@ namespace {
 
 TEST(HostMatcherTest, match_host) {
     HostMatcher matcher;
-    ASSERT_EQ(matcher.add("www.apple.com"), 0);
-    ASSERT_EQ(matcher.add("www.banana.com"), 1);
+    matcher.add("www.apple.com", 100);
+    matcher.add("www.banana.com", 101);
     matcher.build();
-    EXPECT_EQ(matcher.match("www.apple.com"), 0);
-    EXPECT_EQ(matcher.match("www.banana.com"), 1);
-    EXPECT_EQ(matcher.match("www.orange.com"), -1);
-    EXPECT_EQ(matcher.match("apple.com"), -1);
-    EXPECT_EQ(matcher.match("wwwwapple.com"), -1);
-    EXPECT_EQ(matcher.match("wwww.apple.com"), -1);
-    EXPECT_EQ(matcher.match("www.apple.co"), -1);
-    EXPECT_EQ(matcher.match("www.apple.comm"), -1);
+    EXPECT_EQ(matcher.match("www.apple.com"), 100);
+    EXPECT_EQ(matcher.match("www.banana.com"), 101);
+    EXPECT_FALSE(matcher.match("www.orange.com"));
+    EXPECT_FALSE(matcher.match("apple.com"));
+    EXPECT_FALSE(matcher.match("wwwwapple.com"));
+    EXPECT_FALSE(matcher.match("wwww.apple.com"));
+    EXPECT_FALSE(matcher.match("www.apple.co"));
+    EXPECT_FALSE(matcher.match("www.apple.comm"));
 }
 
 TEST(HostMatcherTest, match_host_suffix) {
     HostMatcher matcher;
-    ASSERT_EQ(matcher.add_suffix("apple.com"), 0);
-    ASSERT_EQ(matcher.add_suffix("banana.com"), 1);
+    matcher.add_suffix("apple.com", 100);
+    matcher.add_suffix("banana.com", 101);
     matcher.build();
-    EXPECT_EQ(matcher.match("apple.com"), 0);
-    EXPECT_EQ(matcher.match("banana.com"), 1);
-    EXPECT_EQ(matcher.match("orange.com"), -1);
-    EXPECT_EQ(matcher.match("www.apple.com"), 0);
-    EXPECT_EQ(matcher.match("www.banana.com"), 1);
-    EXPECT_EQ(matcher.match("appleecom"), -1);
-    EXPECT_EQ(matcher.match("aapple.com"), -1);
-    EXPECT_EQ(matcher.match("apple.co"), -1);
-    EXPECT_EQ(matcher.match("apple.comm"), -1);
+    EXPECT_EQ(matcher.match("apple.com"), 100);
+    EXPECT_EQ(matcher.match("banana.com"), 101);
+    EXPECT_FALSE(matcher.match("orange.com"));
+    EXPECT_EQ(matcher.match("www.apple.com"), 100);
+    EXPECT_EQ(matcher.match("www.banana.com"), 101);
+    EXPECT_FALSE(matcher.match("appleecom"));
+    EXPECT_FALSE(matcher.match("aapple.com"));
+    EXPECT_FALSE(matcher.match("apple.co"));
+    EXPECT_FALSE(matcher.match("apple.comm"));
 }
 
 }  // namespace

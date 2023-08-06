@@ -37,7 +37,7 @@ void IntAllocator<T>::deallocate(T value) {
     auto iter = spare_.end();
     while (iter != spare_.begin() && *prev(iter) + 1 == next_) {
         --next_;
-        iter = spare_.erase(iter);
+        iter = spare_.erase(prev(iter));
     }
 }
 

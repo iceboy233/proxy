@@ -41,8 +41,8 @@ void Proxy::create_listeners() {
         auto &handler_ref = *handler;
         handlers_.push_back(std::move(handler));
         system::Listener::Options options;
-        options.timeout = std::chrono::nanoseconds(static_cast<int64_t>(
-            config.get<double>("timeout", 300) * 1000000000));
+        options.timeout = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::duration<double>(config.get<double>("timeout", 300)));
         options.tcp_no_delay = config.get<bool>("tcp_no_delay", true);
         listeners_.push_back(std::make_unique<system::Listener>(
             executor_, *listen_endpoint, handler_ref, options));

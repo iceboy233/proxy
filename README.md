@@ -46,7 +46,7 @@ listeners {
 ```
 listeners {
     "" {
-        listen 0.0.0.0:8388
+        listen [::]:8388
         type shadowsocks
         method 2022-blake3-aes-128-gcm
         password AAAAAAAAAAAAAAAAAAAAAA

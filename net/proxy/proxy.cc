@@ -14,18 +14,26 @@ Proxy::Proxy(const any_io_executor &executor)
     : executor_(executor) {}
 
 void Proxy::load_config(const boost::property_tree::ptree &config) {
-    listeners_config_ = config.get_child("listeners", {});
+    handlers_config_ = config.get_child("handlers", {});
+    auto listeners_config = config.get_child("listeners", {});
+    if (!listeners_config.empty()) {
+        LOG(warning) << "listeners is deprecated, rename to handlers instead";
+        handlers_config_.insert(
+            handlers_config_.end(),
+            listeners_config.begin(),
+            listeners_config.end());
+    }
     connectors_config_ = config.get_child("connectors", {});
     if (connectors_config_.find("") == connectors_config_.not_found()) {
         boost::property_tree::ptree default_connector;
         default_connector.put("type", "system");
         connectors_config_.push_back({"", default_connector});
     }
-    create_listeners();
+    create_handlers();
 }
 
-void Proxy::create_listeners() {
-    for (const auto &pair : listeners_config_) {
+void Proxy::create_handlers() {
+    for (const auto &pair : handlers_config_) {
         const auto &config = pair.second;
         std::string listen_str = config.get<std::string>("listen", "");
         auto listen_endpoint = Endpoint::from_string(listen_str);

@@ -33,7 +33,7 @@ miracle-proxy --config miracle.conf
 ### Socks 5 server
 
 ```
-listeners {
+handlers {
     "" {
         listen 127.0.0.1:1080
         type socks
@@ -44,7 +44,7 @@ listeners {
 ### Shadowsocks server
 
 ```
-listeners {
+handlers {
     "" {
         listen [::]:8388
         type shadowsocks
@@ -57,7 +57,7 @@ listeners {
 ### Socks 5 server, shadowsocks client (ss-local)
 
 ```
-listeners {
+handlers {
     "" {
         listen 127.0.0.1:1080
         type socks

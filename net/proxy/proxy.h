@@ -26,10 +26,10 @@ public:
     const any_io_executor &executor() const { return executor_; }
 
 private:
-    void create_listeners();
+    void create_handlers();
 
     any_io_executor executor_;
-    boost::property_tree::ptree listeners_config_;
+    boost::property_tree::ptree handlers_config_;
     boost::property_tree::ptree connectors_config_;
     std::vector<std::unique_ptr<system::Listener>> listeners_;
     std::vector<std::unique_ptr<Handler>> handlers_;

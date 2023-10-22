@@ -19,7 +19,9 @@ cc_library(
         "//util:int-allocator",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/functional:any_invocable",
+        "@com_google_absl//absl/types:span",
         "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net:endpoint",
         "@org_iceboy_trunk//net:timer-list",
     ],
 )

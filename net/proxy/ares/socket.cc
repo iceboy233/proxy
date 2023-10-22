@@ -26,7 +26,9 @@ bool parse_addr(
             return false;
         }
         const auto *addr4 = reinterpret_cast<const sockaddr_in *>(addr);
-        address = address_v4(ntohl(addr4->sin_addr.s_addr));
+        address_v4::bytes_type bytes;
+        memcpy(bytes.data(), &addr4->sin_addr, 4);
+        address = address_v4(bytes);
         port = ntohs(addr4->sin_port);
         return true;
     } else if (addr->sa_family == AF_INET6) {
@@ -35,7 +37,7 @@ bool parse_addr(
         }
         const auto *addr6 = reinterpret_cast<const sockaddr_in6 *>(addr);
         address_v6::bytes_type bytes;
-        memcpy(bytes.data(), addr6->sin6_addr.s6_addr, 16);
+        memcpy(bytes.data(), &addr6->sin6_addr, 16);
         address = address_v6(bytes);
         port = ntohs(addr6->sin6_port);
         return true;
@@ -54,7 +56,7 @@ bool populate_addr(
         auto *addr4 = reinterpret_cast<sockaddr_in *>(addr);
         addr4->sin_family = AF_INET;
         addr4->sin_port = htons(port);
-        addr4->sin_addr.s_addr = htonl(address.to_v4().to_uint());
+        memcpy(&addr4->sin_addr, address.to_v4().to_bytes().data(), 4);
         *addr_len = sizeof(sockaddr_in);
         return true;
     } else {
@@ -64,7 +66,7 @@ bool populate_addr(
         auto *addr6 = reinterpret_cast<sockaddr_in6 *>(addr);
         addr6->sin6_family = AF_INET6;
         addr6->sin6_port = htons(port);
-        memcpy(addr6->sin6_addr.s6_addr, address.to_v6().to_bytes().data(), 16);
+        memcpy(&addr6->sin6_addr, address.to_v6().to_bytes().data(), 16);
         *addr_len = sizeof(sockaddr_in6);
         return true;
     }

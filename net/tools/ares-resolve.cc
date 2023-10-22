@@ -1,9 +1,7 @@
-#include <memory>
 #include <ostream>
 #include <string_view>
 #include <system_error>
 
-#include "absl/types/span.h"
 #include "base/logging.h"
 #include "io/posix/file.h"
 #include "io/stream.h"
@@ -20,12 +18,9 @@ int main(int argc, char *argv[]) {
     io_context io_context;
     auto executor = io_context.get_executor();
     proxy::system::Connector connector(executor, {});
-    proxy::ares::Resolver resolver(executor, connector, {});
-
-    using Result = BlockingResult<std::error_code, std::vector<address>>;
-    auto results = std::make_unique<Result[]>(argc - 1);
+    BlockingResult<std::error_code, std::vector<address>> results[argc - 1];
     for (int i = 1; i < argc; ++i) {
-        resolver.resolve(argv[i], results[i - 1].callback());
+        connector.resolver().resolve(argv[i], results[i - 1].callback());
     }
 
     io::OStream os(io::posix::stdout);

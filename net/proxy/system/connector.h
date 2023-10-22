@@ -18,6 +18,7 @@ public:
     struct Options {
         std::chrono::nanoseconds timeout = std::chrono::minutes(5);
         bool tcp_no_delay = true;
+        ares::Resolver::Options resolver_options;
     };
 
     Connector(const any_io_executor &executor, const Options &options);
@@ -48,6 +49,8 @@ public:
 
     std::error_code bind_udp_v4(std::unique_ptr<Datagram> &datagram) override;
     std::error_code bind_udp_v6(std::unique_ptr<Datagram> &datagram) override;
+
+    ares::Resolver &resolver() { return resolver_; }
 
 private:
     template <typename EndpointsT>

@@ -54,6 +54,9 @@ Resolver::Resolver(
         abort();
     }
     ares_set_socket_functions(channel_, &funcs_, this);
+    if (!options.servers.empty()) {
+        set_servers(options.servers);
+    }
 }
 
 Resolver::~Resolver() {
@@ -90,6 +93,30 @@ void Resolver::wait() {
         ares_process_fd(channel_, ARES_SOCKET_BAD, ARES_SOCKET_BAD);
         wait();
     });
+}
+
+void Resolver::set_servers(absl::Span<const Endpoint> servers) {
+    ares_addr_port_node nodes[servers.size()];
+    for (size_t i = 0; i < servers.size(); ++i) {
+        nodes[i].next = i + 1 < servers.size() ? &nodes[i + 1] : nullptr;
+        const address &address = servers[i].address();
+        if (address.is_v4()) {
+            nodes[i].family = AF_INET;
+            auto address_bytes = address.to_v4().to_bytes();
+            static_assert(address_bytes.size() == 4);
+            memcpy(&nodes[i].addr.addr4, address_bytes.data(), 4);
+        } else {
+            nodes[i].family = AF_INET6;
+            auto address_bytes = address.to_v6().to_bytes();
+            static_assert(address_bytes.size() == 16);
+            memcpy(&nodes[i].addr.addr6, address_bytes.data(), 16);
+        }
+        nodes[i].udp_port = servers[i].port();
+        nodes[i].tcp_port = servers[i].port();
+    }
+    if (ares_set_servers_ports(channel_, nodes) != ARES_SUCCESS) {
+        abort();
+    }
 }
 
 ares_socket_t Resolver::asocket(
@@ -212,14 +239,16 @@ void Resolver::Operation::parse(int status, ares_addrinfo *ai) {
                 continue;
             }
             auto *addr4 = reinterpret_cast<sockaddr_in *>(node->ai_addr);
-            addresses_.push_back(address_v4(ntohl(addr4->sin_addr.s_addr)));
+            address_v4::bytes_type bytes;
+            memcpy(bytes.data(), &addr4->sin_addr, 4);
+            addresses_.push_back(address_v4(bytes));
         } else if (node->ai_family == AF_INET6) {
             if (node->ai_addrlen < sizeof(sockaddr_in6)) {
                 continue;
             }
             auto *addr6 = reinterpret_cast<sockaddr_in6 *>(node->ai_addr);
             address_v6::bytes_type bytes;
-            memcpy(bytes.data(), addr6->sin6_addr.s6_addr, 16);
+            memcpy(bytes.data(), &addr6->sin6_addr, 16);
             addresses_.push_back(address_v6(bytes));
         }
     }

@@ -11,7 +11,7 @@ namespace system {
 
 Connector::Connector(const any_io_executor &executor, const Options &options)
     : executor_(executor),
-      resolver_(executor_, *this, {}),
+      resolver_(executor_, *this, options.resolver_options),
       timer_list_(executor_, options.timeout),
       tcp_no_delay_(options.tcp_no_delay) {}
 

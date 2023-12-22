@@ -96,7 +96,7 @@ void Resolver::wait() {
 }
 
 void Resolver::set_servers(absl::Span<const Endpoint> servers) {
-    ares_addr_port_node nodes[servers.size()];
+    auto nodes = std::make_unique<ares_addr_port_node[]>(servers.size());
     for (size_t i = 0; i < servers.size(); ++i) {
         nodes[i].next = i + 1 < servers.size() ? &nodes[i + 1] : nullptr;
         const address &address = servers[i].address();
@@ -114,7 +114,7 @@ void Resolver::set_servers(absl::Span<const Endpoint> servers) {
         nodes[i].udp_port = servers[i].port();
         nodes[i].tcp_port = servers[i].port();
     }
-    if (ares_set_servers_ports(channel_, nodes) != ARES_SUCCESS) {
+    if (ares_set_servers_ports(channel_, nodes.get()) != ARES_SUCCESS) {
         abort();
     }
 }

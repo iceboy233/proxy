@@ -18,7 +18,8 @@ int main(int argc, char *argv[]) {
     io_context io_context;
     auto executor = io_context.get_executor();
     proxy::system::Connector connector(executor, {});
-    BlockingResult<std::error_code, std::vector<address>> results[argc - 1];
+    auto results = std::make_unique<
+        BlockingResult<std::error_code, std::vector<address>>[]>(argc - 1);
     for (int i = 1; i < argc; ++i) {
         connector.resolver().resolve(argv[i], results[i - 1].callback());
     }

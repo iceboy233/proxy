@@ -23,10 +23,13 @@ namespace ares {
 
 class Resolver {
 public:
+    enum class AddressFamily { prefer_v4, prefer_v6, v4_only, v6_only };
+
     struct Options {
         std::vector<Endpoint> servers;
         std::chrono::milliseconds query_timeout = std::chrono::seconds(1);
         std::chrono::nanoseconds cache_timeout = std::chrono::minutes(1);
+        AddressFamily address_family = AddressFamily::prefer_v4;
     };
 
     Resolver(
@@ -65,6 +68,7 @@ private:
     ares_channel channel_ = nullptr;
     steady_timer wait_timer_;
     TimerList cache_timer_list_;
+    AddressFamily address_family_;
     absl::flat_hash_map<std::string, Operation *> operations_;
     absl::flat_hash_map<ares_socket_t, boost::intrusive_ptr<Socket>> sockets_;
     util::IntAllocator<ares_socket_t> socket_allocator_;

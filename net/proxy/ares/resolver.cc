@@ -1,5 +1,6 @@
 #include "net/proxy/ares/resolver.h"
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <optional>
@@ -43,7 +44,8 @@ Resolver::Resolver(
     : executor_(executor),
       connector_(connector),
       wait_timer_(executor_),
-      cache_timer_list_(executor_, options.cache_timeout) {
+      cache_timer_list_(executor_, options.cache_timeout),
+      address_family_(options.address_family) {
     if (ares_library_init(ARES_LIB_INIT_ALL) != ARES_SUCCESS) {
         abort();
     }
@@ -206,8 +208,20 @@ void Resolver::Operation::add_callback(ResolveCallback callback) {
 }
 
 void Resolver::Operation::start() {
+    ares_addrinfo_hints hints = {};
+    switch (resolver_.address_family_) {
+    case AddressFamily::v4_only:
+        hints.ai_family = AF_INET;
+        break;
+    case AddressFamily::v6_only:
+        hints.ai_family = AF_INET6;
+        break;
+    default:
+        hints.ai_family = AF_UNSPEC;
+        break;
+    }
     ares_getaddrinfo(
-        resolver_.channel_, host_.c_str(), nullptr, nullptr, finish, this);
+        resolver_.channel_, host_.c_str(), nullptr, &hints, finish, this);
 }
 
 void Resolver::Operation::finish(
@@ -252,6 +266,20 @@ void Resolver::Operation::parse(int status, ares_addrinfo *ai) {
             addresses_.push_back(address_v6(bytes));
         }
     }
+    switch (resolver_.address_family_) {
+    case AddressFamily::prefer_v4:
+        std::stable_partition(
+            addresses_.begin(), addresses_.end(),
+            [](const address &address) { return address.is_v4(); });
+        break;
+    case AddressFamily::prefer_v6:
+        std::stable_partition(
+            addresses_.begin(), addresses_.end(),
+            [](const address &address) { return address.is_v6(); });
+        break;
+    default:
+        break;
+    }    
 }
 
 void Resolver::Operation::cache() {

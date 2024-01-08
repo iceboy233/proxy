@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include "net/proxy/datagram.h"
 #include "net/proxy/stream.h"
 
 namespace net {
@@ -13,6 +14,7 @@ public:
     virtual ~Handler() = default;
 
     virtual void handle_stream(std::unique_ptr<Stream> stream) = 0;
+    virtual void handle_datagram(std::unique_ptr<Datagram> datagram) = 0;
 };
 
 }  // namespace proxy

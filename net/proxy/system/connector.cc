@@ -63,24 +63,24 @@ void Connector::connect_tcp_host(
 }
 
 std::error_code Connector::bind_udp_v4(std::unique_ptr<Datagram> &datagram) {
-    auto new_datagram = std::make_unique<UdpSocketDatagram>(executor_);
+    udp::socket socket(executor_);
     boost::system::error_code ec;
-    new_datagram->socket().open(udp::v4(), ec);
+    socket.open(udp::v4(), ec);
     if (ec) {
         return ec;
     }
-    datagram = std::move(new_datagram);
+    datagram = std::make_unique<UdpSocketDatagram>(std::move(socket));
     return {};
 }
 
 std::error_code Connector::bind_udp_v6(std::unique_ptr<Datagram> &datagram) {
-    auto new_datagram = std::make_unique<UdpSocketDatagram>(executor_);
+    udp::socket socket(executor_);
     boost::system::error_code ec;
-    new_datagram->socket().open(udp::v6(), ec);
+    socket.open(udp::v6(), ec);
     if (ec) {
         return ec;
     }
-    datagram = std::move(new_datagram);
+    datagram = std::make_unique<UdpSocketDatagram>(std::move(socket));
     return {};
 }
 

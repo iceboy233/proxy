@@ -10,6 +10,7 @@ namespace misc {
 class NullHandler : public Handler {
 public:
     void handle_stream(std::unique_ptr<Stream> stream) override;
+    void handle_datagram(std::unique_ptr<Datagram> datagram) override;
 };
 
 }  // namespace misc

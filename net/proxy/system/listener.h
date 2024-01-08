@@ -30,10 +30,12 @@ public:
 private:
     void accept();
     void accept_error_wait();
+    void bind();
 
     any_io_executor executor_;
-    tcp::acceptor tcp_acceptor_;
+    Endpoint endpoint_;
     Handler &handler_;
+    tcp::acceptor tcp_acceptor_;
     TimerList timer_list_;
     bool tcp_no_delay_;
     std::chrono::nanoseconds accept_error_delay_;

@@ -25,6 +25,7 @@ public:
     bool init(const InitOptions &config);
 
     void handle_stream(std::unique_ptr<Stream> stream) override;
+    void handle_datagram(std::unique_ptr<Datagram> datagram) override;
 
 private:
     class TcpConnection;

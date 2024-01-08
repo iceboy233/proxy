@@ -7,6 +7,7 @@
 
 #include "absl/algorithm/algorithm.h"
 #include "absl/container/fixed_array.h"
+#include "base/logging.h"
 #include "base/types.h"
 
 namespace net {
@@ -58,6 +59,11 @@ void Handler::handle_stream(std::unique_ptr<Stream> stream) {
     boost::intrusive_ptr<TcpConnection> connection(new TcpConnection(
         *this, std::move(stream)));
     connection->start();
+}
+
+void Handler::handle_datagram(std::unique_ptr<Datagram> datagram) {
+    // TODO: Report support status to avoid this being called.
+    LOG(warning) << "datagram is not supported";
 }
 
 Handler::TcpConnection::TcpConnection(

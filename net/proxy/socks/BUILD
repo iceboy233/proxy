@@ -21,6 +21,7 @@ cc_library(
         "@com_google_absl//absl/algorithm",
         "@com_google_absl//absl/container:fixed_array",
         "@org_boost_boost//:endian",
+        "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//base:types",
         "@org_iceboy_trunk//net:asio",
     ],

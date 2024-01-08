@@ -6,6 +6,9 @@ namespace net {
 namespace proxy {
 namespace system {
 
+UdpSocketDatagram::UdpSocketDatagram(udp::socket socket)
+    : socket_(std::move(socket)) {}
+
 void UdpSocketDatagram::async_receive_from(
     absl::Span<mutable_buffer const> buffers,
     udp::endpoint &endpoint,

@@ -71,6 +71,11 @@ void Handler::handle_stream(std::unique_ptr<Stream> stream) {
     connection->start();
 }
 
+void Handler::handle_datagram(std::unique_ptr<Datagram> datagram) {
+    // TODO: support datagram
+    LOG(warning) << "datagram is not supported yet";
+}
+
 Handler::TcpConnection::TcpConnection(
     Handler &handler,
     std::unique_ptr<Stream> stream)

@@ -10,11 +10,14 @@ namespace system {
 
 class UdpSocketDatagram : public Datagram {
 public:
-    explicit UdpSocketDatagram(const any_io_executor &executor)
-        : socket_(executor) {}
+    explicit UdpSocketDatagram(udp::socket socket);
 
     UdpSocketDatagram(const UdpSocketDatagram &) = delete;
     UdpSocketDatagram &operator=(const UdpSocketDatagram &) = delete;
+
+    any_io_executor get_executor() override {
+        return socket_.get_executor();
+    }
 
     void async_receive_from(
         absl::Span<mutable_buffer const> buffers,
@@ -26,9 +29,8 @@ public:
         const udp::endpoint &endpoint,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
-    any_io_executor get_executor() override {
-        return socket_.get_executor();
-    }
+    using Datagram::async_receive_from;
+    using Datagram::async_send_to;
 
     udp::socket &socket() { return socket_; }
     const udp::socket &socket() const { return socket_; }

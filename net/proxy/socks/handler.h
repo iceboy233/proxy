@@ -14,6 +14,7 @@ public:
     Handler(const any_io_executor &executor, proxy::Connector &connector);
 
     void handle_stream(std::unique_ptr<Stream> stream) override;
+    void handle_datagram(std::unique_ptr<Datagram> datagram) override;
 
 private:
     class TcpConnection;

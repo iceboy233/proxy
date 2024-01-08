@@ -33,6 +33,7 @@ cc_library(
     hdrs = ["listener.h"],
     deps = [
         ":tcp-socket-stream",
+        ":udp-socket-datagram",
         "//net/proxy:interface",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:asio",

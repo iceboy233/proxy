@@ -4,6 +4,7 @@
 
 #include "base/logging.h"
 #include "net/proxy/system/tcp-socket-stream.h"
+#include "net/proxy/system/udp-socket-datagram.h"
 
 namespace net {
 namespace proxy {
@@ -15,12 +16,18 @@ Listener::Listener(
     Handler &handler,
     const Options &options)
     : executor_(executor),
-      tcp_acceptor_(executor, endpoint),
+      endpoint_(endpoint),
       handler_(handler),
+      tcp_acceptor_(executor_, endpoint),
       timer_list_(executor_, options.timeout),
       tcp_no_delay_(options.tcp_no_delay),
       accept_error_delay_(options.accept_error_delay),
-      accept_error_timer_(executor_) { accept(); }
+      accept_error_timer_(executor_) {
+    // TODO: Support more flexible config, such as enabling TCP or UDP
+    // individually, using different handlers, and live config reloading.
+    accept();
+    bind();
+}
 
 void Listener::accept() {
     tcp_acceptor_.async_accept(
@@ -49,6 +56,12 @@ void Listener::accept_error_wait() {
         }
         accept();
     });
+}
+
+void Listener::bind() {
+    udp::socket socket(executor_, endpoint_);
+    handler_.handle_datagram(
+        std::make_unique<UdpSocketDatagram>(std::move(socket)));
 }
 
 }  // namespace system

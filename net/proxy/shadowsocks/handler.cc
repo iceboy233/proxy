@@ -7,7 +7,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
-#include "absl/base/attributes.h"
 #include "absl/container/fixed_array.h"
 #include "base/logging.h"
 #include "net/proxy/shadowsocks/decryptor.h"
@@ -111,7 +110,7 @@ void Handler::TcpConnection::forward_parse() {
             return;
         }
         read_state_ = ReadState::header_length;
-        ABSL_FALLTHROUGH_INTENDED;
+        [[fallthrough]];
     case ReadState::header_length:
         if (handler_.pre_shared_key_.method().is_spec_2022()) {
             if (!decryptor_.start_chunk(11)) {
@@ -150,7 +149,7 @@ void Handler::TcpConnection::forward_parse() {
         read_length_ = decryptor_.pop_big_u16();
         decryptor_.finish_chunk();
         read_state_ = ReadState::header_payload;
-        ABSL_FALLTHROUGH_INTENDED;
+        [[fallthrough]];
     case ReadState::header_payload:
         if (!decryptor_.start_chunk(read_length_)) {
             forward_read();
@@ -176,7 +175,7 @@ void Handler::TcpConnection::forward_parse() {
         read_length_ = decryptor_.pop_big_u16();
         decryptor_.finish_chunk();
         read_state_ = ReadState::payload;
-        ABSL_FALLTHROUGH_INTENDED;
+        [[fallthrough]];
     case ReadState::payload:
         if (!decryptor_.start_chunk(read_length_)) {
             forward_read();

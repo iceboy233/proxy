@@ -4,7 +4,6 @@
 #include <memory>
 #include <utility>
 
-#include "absl/base/attributes.h"
 #include "base/logging.h"
 #include "net/proxy/shadowsocks/decryptor.h"
 #include "net/proxy/shadowsocks/encryptor.h"
@@ -325,7 +324,7 @@ void Connector::TcpStream::async_read_some(
                 continue;
             }
             read_state_ = ReadState::header;
-            ABSL_FALLTHROUGH_INTENDED;
+            [[fallthrough]];
         case ReadState::header:
             if (!decryptor_.start_chunk(
                 connector_.pre_shared_key_.method().salt_size() + 11)) {
@@ -377,7 +376,7 @@ void Connector::TcpStream::async_read_some(
             read_length_ = decryptor_.pop_big_u16();
             decryptor_.finish_chunk();
             read_state_ = ReadState::payload;
-            ABSL_FALLTHROUGH_INTENDED;
+            [[fallthrough]];
         case ReadState::payload:
             if (!decryptor_.start_chunk(read_length_)) {
                 read(buffers, std::move(callback));
@@ -385,7 +384,7 @@ void Connector::TcpStream::async_read_some(
             }
             read_buffer_ = {decryptor_.pop_buffer(read_length_), read_length_};
             read_state_ = ReadState::payload_tail;
-            ABSL_FALLTHROUGH_INTENDED;
+            [[fallthrough]];
         case ReadState::payload_tail:
             size_t total_size = 0;
             for (mutable_buffer buffer : buffers) {

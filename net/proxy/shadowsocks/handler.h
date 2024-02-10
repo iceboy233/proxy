@@ -39,4 +39,4 @@ private:
 }  // namespace proxy
 }  // namespace net
 
-#endif  // _NET_PROXY_SHADOWSOCKS_Handler_H
+#endif  // _NET_PROXY_SHADOWSOCKS_HANDLER_H

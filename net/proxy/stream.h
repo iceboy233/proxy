@@ -17,7 +17,6 @@ public:
     using executor_type = any_io_executor;
 
     virtual ~Stream() = default;
-    virtual any_io_executor get_executor() = 0;
 
     virtual void async_read_some(
         absl::Span<mutable_buffer const> buffers,
@@ -26,6 +25,9 @@ public:
     virtual void async_write_some(
         absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) = 0;
+
+    virtual any_io_executor get_executor() = 0;
+    virtual void close() = 0;
 
     template <typename BuffersT>
     void async_read_some(

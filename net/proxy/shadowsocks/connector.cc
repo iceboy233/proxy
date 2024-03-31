@@ -43,7 +43,8 @@ public:
         absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
-    any_io_executor get_executor() override;
+    any_io_executor get_executor() override { return connector_.executor_; }
+    void close() override { base_stream_->close(); }
 
 private:
     void connect(absl::AnyInvocable<void(std::error_code) &&> callback);
@@ -453,10 +454,6 @@ void Connector::TcpStream::async_write_some(
             }
             std::move(callback)({}, total_size);
         });
-}
-
-any_io_executor Connector::TcpStream::get_executor() {
-    return connector_.executor_;
 }
 
 }  // namespace shadowsocks

@@ -85,9 +85,6 @@ Handler::TcpConnection::TcpConnection(
       write_header_(handler_.pre_shared_key_.method().is_spec_2022()) {}
 
 void Handler::TcpConnection::forward_read() {
-    if (!stream_) {
-        return;
-    }
     BufferSpan read_buffer = decryptor_.buffer();
     stream_->async_read_some(
         buffer(read_buffer.data(), read_buffer.size()),
@@ -342,9 +339,6 @@ void Handler::TcpConnection::forward_parse_host(size_t header_length) {
 }
 
 void Handler::TcpConnection::forward_write() {
-    if (!remote_stream_) {
-        return;
-    }
     async_write(
         *remote_stream_,
         buffer(decryptor_.pop_buffer(read_length_), read_length_),
@@ -361,9 +355,6 @@ void Handler::TcpConnection::forward_write() {
 }
 
 void Handler::TcpConnection::backward_read() {
-    if (!remote_stream_) {
-        return;
-    }
     remote_stream_->async_read_some(
         buffer(backward_read_buffer_.data(), backward_read_buffer_.size()),
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
@@ -378,9 +369,6 @@ void Handler::TcpConnection::backward_read() {
 }
 
 void Handler::TcpConnection::backward_write() {
-    if (!stream_) {
-        return;
-    }
     ConstBufferSpan read_buffer(
         backward_read_buffer_.data(), backward_read_size_);
     do {
@@ -420,8 +408,10 @@ void Handler::TcpConnection::backward_write() {
 }
 
 void Handler::TcpConnection::close() {
-    remote_stream_.reset();
-    stream_.reset();
+    if (remote_stream_) {
+        remote_stream_->close();
+    }
+    stream_->close();
 }
 
 }  // namespace shadowsocks

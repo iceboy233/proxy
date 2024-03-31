@@ -76,9 +76,6 @@ Handler::TcpConnection::TcpConnection(
       backward_buffer_(4096) {}
 
 void Handler::TcpConnection::forward_read() {
-    if (!stream_) {
-        return;
-    }
     stream_->async_read_some(
         buffer(
             &forward_buffer_[forward_size_],
@@ -246,9 +243,6 @@ void Handler::TcpConnection::connect_host(ConstBufferSpan buffer) {
 }
 
 void Handler::TcpConnection::forward_write() {
-    if (!remote_stream_) {
-        return;
-    }
     async_write(
         *remote_stream_,
         buffer(forward_buffer_.data(), forward_size_),
@@ -279,9 +273,6 @@ void Handler::TcpConnection::reply() {
 }
 
 void Handler::TcpConnection::backward_write() {
-    if (!stream_) {
-        return;
-    }
     async_write(
         *stream_,
         buffer(backward_buffer_.data(), backward_size_),
@@ -309,9 +300,6 @@ void Handler::TcpConnection::backward_dispatch() {
 }
 
 void Handler::TcpConnection::backward_read() {
-    if (!remote_stream_) {
-        return;
-    }
     remote_stream_->async_read_some(
         buffer(
             &backward_buffer_[backward_size_],
@@ -328,8 +316,10 @@ void Handler::TcpConnection::backward_read() {
 }
 
 void Handler::TcpConnection::close() {
-    remote_stream_.reset();
-    stream_.reset();
+    if (remote_stream_) {
+        remote_stream_->close();
+    }
+    stream_->close();
 }
 
 }  // namespace socks

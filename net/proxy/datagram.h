@@ -17,7 +17,6 @@ public:
     using executor_type = any_io_executor;
 
     virtual ~Datagram() = default;
-    virtual any_io_executor get_executor() = 0;
 
     virtual void async_receive_from(
         absl::Span<mutable_buffer const> buffers,
@@ -28,6 +27,9 @@ public:
         absl::Span<const_buffer const> buffers,
         const udp::endpoint &endpoint,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) = 0;
+
+    virtual any_io_executor get_executor() = 0;
+    virtual void close() = 0;
 
     template <typename BuffersT>
     void async_receive_from(

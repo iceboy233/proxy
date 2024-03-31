@@ -29,6 +29,11 @@ void UdpSocketDatagram::async_send_to(
         std::move(callback));
 }
 
+void UdpSocketDatagram::close() {
+    boost::system::error_code ec;
+    socket_.close(ec);
+}
+
 }  // namespace proxy
 }  // namespace system
 }  // namespace net

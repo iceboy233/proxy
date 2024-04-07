@@ -43,6 +43,17 @@ cc_library(
 )
 
 cc_library(
+    name = "stdio-stream",
+    srcs = ["stdio-stream.cc"],
+    hdrs = ["stdio-stream.h"],
+    deps = [
+        "//net/proxy:interface",
+        "@com_google_absl//absl/container:fixed_array",
+        "@org_iceboy_trunk//net:asio",
+    ],
+)
+
+cc_library(
     name = "tcp-socket-stream",
     srcs = ["tcp-socket-stream.cc"],
     hdrs = ["tcp-socket-stream.h"],

@@ -13,7 +13,9 @@ namespace proxy {
 Proxy::Proxy(const any_io_executor &executor)
     : executor_(executor) {}
 
-void Proxy::load_config(const boost::property_tree::ptree &config) {
+void Proxy::load_config(
+    const boost::property_tree::ptree &config,
+    const LoadConfigOptions &options) {
     handlers_config_ = config.get_child("handlers", {});
     auto listeners_config = config.get_child("listeners", {});
     if (!listeners_config.empty()) {
@@ -29,7 +31,9 @@ void Proxy::load_config(const boost::property_tree::ptree &config) {
         default_connector.put("type", "system");
         connectors_config_.push_back({"", default_connector});
     }
-    create_handlers();
+    if (options.create_handlers) {
+        create_handlers();
+    }
 }
 
 void Proxy::create_handlers() {

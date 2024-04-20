@@ -17,6 +17,7 @@ int main(int argc, char *argv[]) {
     boost::property_tree::ptree config;
     boost::property_tree::read_info(flags::config, config);
     net::proxy::Proxy proxy(executor);
-    proxy.load_config(config);
+    net::proxy::Proxy::LoadConfigOptions options;
+    proxy.load_config(config, options);
     io_context.run();
 }

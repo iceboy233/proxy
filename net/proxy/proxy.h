@@ -20,7 +20,14 @@ class Proxy {
 public:
     Proxy(const any_io_executor &executor);
 
-    void load_config(const boost::property_tree::ptree &config);
+    struct LoadConfigOptions {
+        bool create_handlers = true;
+    };
+
+    void load_config(
+        const boost::property_tree::ptree &config,
+        const LoadConfigOptions &options);
+
     Connector *get_connector(std::string_view name);
 
     const any_io_executor &executor() const { return executor_; }

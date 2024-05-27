@@ -22,9 +22,12 @@ cc_binary(
         "//net/proxy/shadowsocks:config",
         "//net/proxy/socks:config",
         "//net/proxy/system:config",
+        "//net/proxy/system:stdio-stream",
+        "//net/proxy/util:copy",
         "@org_boost_boost//:property_tree",
         "@org_iceboy_trunk//base:flags",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//util:strings",
     ],
 )

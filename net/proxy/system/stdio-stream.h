@@ -1,6 +1,7 @@
 #ifndef _NET_PROXY_SYSTEM_STDIO_STREAM_H
 #define _NET_PROXY_SYSTEM_STDIO_STREAM_H
 
+#include "net/asio.h"
 #include "net/proxy/stream.h"
 
 namespace net {
@@ -26,8 +27,8 @@ public:
     void close() override;
 
 private:
-    boost::asio::posix::stream_descriptor stdin_;
-    boost::asio::posix::stream_descriptor stdout_;
+    readable_pipe stdin_;
+    writable_pipe stdout_;
 };
 
 }  // namespace system

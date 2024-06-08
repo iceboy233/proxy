@@ -3,7 +3,7 @@
 #include <system_error>
 
 #include "base/logging.h"
-#include "io/posix/file.h"
+#include "io/native-file.h"
 #include "io/stream.h"
 #include "net/asio.h"
 #include "net/blocking-result.h"
@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
         connector.resolver().resolve(argv[i], results[i - 1].callback());
     }
 
-    io::OStream os(io::posix::stdout);
+    io::OStream os(io::std_output());
     for (int i = 1; i < argc; ++i) {
         auto &result = results[i - 1];
         result.run(io_context);

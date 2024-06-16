@@ -50,7 +50,13 @@ cc_library(
         "//net/proxy:interface",
         "@com_google_absl//absl/container:fixed_array",
         "@org_iceboy_trunk//net:asio",
-    ],
+    ] + select({
+        "@platforms//os:windows": [
+            "@org_iceboy_trunk//io:file-utils",
+            "@org_iceboy_trunk//io:native-file",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 cc_library(

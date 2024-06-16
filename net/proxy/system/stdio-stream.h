@@ -1,6 +1,9 @@
 #ifndef _NET_PROXY_SYSTEM_STDIO_STREAM_H
 #define _NET_PROXY_SYSTEM_STDIO_STREAM_H
 
+#ifdef _WIN32
+#include "io/native-file.h"
+#endif
 #include "net/asio.h"
 #include "net/proxy/stream.h"
 
@@ -23,12 +26,20 @@ public:
         absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
-    any_io_executor get_executor() override { return stdin_.get_executor(); }
+    any_io_executor get_executor() override { return executor_; }
     void close() override;
 
 private:
+    any_io_executor executor_;
+#ifndef _WIN32
     readable_pipe stdin_;
     writable_pipe stdout_;
+#else
+    static_thread_pool stdin_thread_;
+    static_thread_pool stdout_thread_;
+    io::NativeSharedFile stdin_;
+    io::NativeSharedFile stdout_;
+#endif  // _WIN32
 };
 
 }  // namespace system

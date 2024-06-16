@@ -73,3 +73,9 @@ connectors {
     }
 }
 ```
+
+### Use with OpenSSH ProxyCommand
+
+```
+ProxyCommand miracle-proxy --config=miracle.conf --tcp_connect_target="%h:%p" --tcp_connect_with=proxy
+```

@@ -49,7 +49,6 @@ private:
     Decryptor decryptor_;
     ReadState read_state_ = ReadState::init;
     uint16_t read_length_;
-    ConstBufferSpan read_buffer_;
     absl::FixedArray<uint8_t, 0> backward_read_buffer_;
     size_t backward_read_size_;
     bool write_header_;

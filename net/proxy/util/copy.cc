@@ -14,7 +14,7 @@ public:
     CopyBidirOperation(
         std::unique_ptr<Stream> stream0,
         std::unique_ptr<Stream> stream1,
-        absl::AnyInvocable<void(std::error_code)> callback);
+        absl::AnyInvocable<void(std::error_code) &&> callback);
 
     void start();
 
@@ -27,7 +27,7 @@ private:
 
     std::unique_ptr<Stream> stream0_;
     std::unique_ptr<Stream> stream1_;
-    absl::AnyInvocable<void(std::error_code)> callback_;
+    absl::AnyInvocable<void(std::error_code) &&> callback_;
     absl::FixedArray<uint8_t, 0> forward_buffer_;
     size_t forward_size_;
     absl::FixedArray<uint8_t, 0> backward_buffer_;
@@ -38,7 +38,7 @@ private:
 CopyBidirOperation::CopyBidirOperation(
     std::unique_ptr<Stream> stream0,
     std::unique_ptr<Stream> stream1,
-    absl::AnyInvocable<void(std::error_code)> callback)
+    absl::AnyInvocable<void(std::error_code) &&> callback)
     : stream0_(std::move(stream0)),
       stream1_(std::move(stream1)),
       callback_(std::move(callback)),
@@ -121,7 +121,7 @@ void CopyBidirOperation::finish_one(std::error_code ec) {
 void copy_bidir(
     std::unique_ptr<Stream> stream0,
     std::unique_ptr<Stream> stream1,
-    absl::AnyInvocable<void(std::error_code)> callback) {
+    absl::AnyInvocable<void(std::error_code) &&> callback) {
     auto *operation = new CopyBidirOperation(
         std::move(stream0), std::move(stream1), std::move(callback));
     operation->start();

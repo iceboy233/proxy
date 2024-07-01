@@ -27,7 +27,7 @@ REGISTER_CONNECTOR(system, [](
         std::string server_str = iters.first->second.get_value<std::string>();
         auto server_endpoint = Endpoint::from_string(server_str);
         if (!server_endpoint) {
-            LOG(error) << "invalid server endpoint: " << server_str;
+            LOG(error) << "invalid server: " << server_str;
             continue;
         }
         options.resolver_options.servers.push_back(*server_endpoint);
@@ -47,7 +47,7 @@ REGISTER_CONNECTOR(system, [](
         options.resolver_options.address_family =
             ares::Resolver::AddressFamily::v6_only;
     } else {
-        LOG(error) << "invalid prefer: " << address_family;
+        LOG(error) << "invalid address-family: " << address_family;
     }
     return std::make_unique<Connector>(proxy.executor(), options);
 });

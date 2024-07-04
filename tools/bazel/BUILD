@@ -4,7 +4,8 @@ cc_toolchain_suite(
     name = "toolchain",
     toolchains = {
         "aarch64": ":aarch64_toolchain",
-        "k8": ":k8_toolchain",
+        "k8": ":x86_64_toolchain",  # for bazel compatibility
+        "x86_64": ":x86_64_toolchain",
     },
 )
 
@@ -49,9 +50,9 @@ cc_toolchain_config(
 )
 
 cc_toolchain(
-    name = "k8_toolchain",
-    toolchain_identifier = "k8-toolchain",
-    toolchain_config = ":k8_toolchain_config",
+    name = "x86_64_toolchain",
+    toolchain_identifier = "x86_64-toolchain",
+    toolchain_config = ":x86_64_toolchain_config",
     all_files = ":empty",
     compiler_files = ":empty",
     dwp_files = ":empty",
@@ -62,8 +63,8 @@ cc_toolchain(
 )
 
 cc_toolchain_config(
-    name = "k8_toolchain_config",
-    cpu = "k8",
+    name = "x86_64_toolchain_config",
+    cpu = "x86_64",
     target = "x86_64-linux-gnu",
     dbg_compile_flags = [
         "-g",
@@ -95,7 +96,7 @@ platform(
 )
 
 platform(
-    name = "linux-amd64",
+    name = "linux-x86_64",
     constraint_values = [
        "@platforms//cpu:x86_64",
        "@platforms//os:linux",
@@ -103,7 +104,7 @@ platform(
 )
 
 platform(
-    name = "windows-amd64",
+    name = "windows-x86_64",
     constraint_values = [
        "@platforms//cpu:x86_64",
        "@platforms//os:windows",

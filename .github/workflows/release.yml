@@ -6,7 +6,7 @@ on:
       - "v*.*.*"
 
 jobs:
-  build-linux-amd64:
+  build-linux-x86_64:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
@@ -17,12 +17,12 @@ jobs:
       - name: Build
         run: |
           bazel build -c opt net/tools:miracle-proxy
-          ln bazel-bin/net/tools/miracle-proxy miracle-proxy-${GITHUB_REF_NAME}-linux-amd64
+          ln bazel-bin/net/tools/miracle-proxy miracle-proxy-${GITHUB_REF_NAME}-linux-x86_64
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            miracle-proxy-v*.*.*-linux-amd64
+            miracle-proxy-v*.*.*-linux-x86_64
 
   build-linux-arm64:
     runs-on: ubuntu-20.04
@@ -36,7 +36,7 @@ jobs:
           sudo chmod +x /usr/local/bin/bazel
       - name: Build
         run: |
-          bazel build -c opt --cpu=aarch64 --crosstool_top=//tools/bazel:toolchain --platforms=tools/bazel:linux-arm64 net/tools:miracle-proxy
+          bazel build -c opt --cpu=aarch64 --crosstool_top=tools/bazel:toolchain --platforms=tools/bazel:linux-arm64 net/tools:miracle-proxy
           ln bazel-bin/net/tools/miracle-proxy miracle-proxy-${GITHUB_REF_NAME}-linux-arm64
       - name: Release
         uses: softprops/action-gh-release@v1
@@ -44,16 +44,16 @@ jobs:
           files: |
             miracle-proxy-v*.*.*-linux-arm64
 
-  build-windows-amd64:
+  build-windows-x86_64:
     runs-on: windows-2019
     steps:
       - uses: actions/checkout@v3
       - name: Build
         run: |
           bazel build -c opt net/tools:miracle-proxy
-          Copy-Item bazel-bin\net\tools\miracle-proxy.exe -Destination miracle-proxy-$Env:GITHUB_REF_NAME-windows-amd64.exe
+          Copy-Item bazel-bin\net\tools\miracle-proxy.exe -Destination miracle-proxy-$Env:GITHUB_REF_NAME-windows-x86_64.exe
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            miracle-proxy-v*.*.*-windows-amd64.exe
+            miracle-proxy-v*.*.*-windows-x86_64.exe

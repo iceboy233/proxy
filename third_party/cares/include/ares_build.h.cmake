@@ -5,21 +5,21 @@
  * SPDX-License-Identifier: MIT
  */
 
-#define CARES_TYPEOF_ARES_SOCKLEN_T socklen_t
-#define CARES_TYPEOF_ARES_SSIZE_T ssize_t
+#define CARES_TYPEOF_ARES_SOCKLEN_T @CARES_TYPEOF_ARES_SOCKLEN_T@
+#define CARES_TYPEOF_ARES_SSIZE_T @CARES_TYPEOF_ARES_SSIZE_T@
 
 /* Prefix names with CARES_ to make sure they don't conflict with other config.h
  * files.  We need to include some dependent headers that may be system specific
  * for C-Ares */
-#define CARES_HAVE_SYS_TYPES_H
-#define CARES_HAVE_SYS_RANDOM_H
-#define CARES_HAVE_SYS_SOCKET_H
-/* #undef CARES_HAVE_WINDOWS_H */
-/* #undef CARES_HAVE_WS2TCPIP_H */
-/* #undef CARES_HAVE_WINSOCK2_H */
-/* #undef CARES_HAVE_WINDOWS_H */
-#define CARES_HAVE_ARPA_NAMESER_H
-#define CARES_HAVE_ARPA_NAMESER_COMPAT_H
+#cmakedefine CARES_HAVE_SYS_TYPES_H
+#cmakedefine CARES_HAVE_SYS_RANDOM_H
+#cmakedefine CARES_HAVE_SYS_SOCKET_H
+#cmakedefine CARES_HAVE_WINDOWS_H
+#cmakedefine CARES_HAVE_WS2TCPIP_H
+#cmakedefine CARES_HAVE_WINSOCK2_H
+#cmakedefine CARES_HAVE_WINDOWS_H
+#cmakedefine CARES_HAVE_ARPA_NAMESER_H
+#cmakedefine CARES_HAVE_ARPA_NAMESER_COMPAT_H
 
 #ifdef CARES_HAVE_SYS_TYPES_H
 #  include <sys/types.h>

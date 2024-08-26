@@ -9,7 +9,7 @@ namespace system {
 UdpSocketDatagram::UdpSocketDatagram(udp::socket socket)
     : socket_(std::move(socket)) {}
 
-void UdpSocketDatagram::async_receive_from(
+void UdpSocketDatagram::receive_from(
     absl::Span<mutable_buffer const> buffers,
     udp::endpoint &endpoint,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
@@ -19,7 +19,7 @@ void UdpSocketDatagram::async_receive_from(
         std::move(callback));
 }
 
-void UdpSocketDatagram::async_send_to(
+void UdpSocketDatagram::send_to(
     absl::Span<const_buffer const> buffers,
     const udp::endpoint &endpoint,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {

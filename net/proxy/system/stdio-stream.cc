@@ -22,7 +22,7 @@ StdioStream::StdioStream(const any_io_executor &executor)
 #endif
     {}
 
-void StdioStream::async_read_some(
+void StdioStream::read(
     absl::Span<mutable_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
 #ifndef _WIN32
@@ -49,7 +49,7 @@ void StdioStream::async_read_some(
 #endif
 }
 
-void StdioStream::async_write_some(
+void StdioStream::write(
     absl::Span<const_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
 #ifndef _WIN32

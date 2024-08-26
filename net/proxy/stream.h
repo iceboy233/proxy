@@ -18,48 +18,40 @@ public:
 
     virtual ~Stream() = default;
 
-    virtual void async_read_some(
+    virtual void read(
         absl::Span<mutable_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) = 0;
 
-    virtual void async_write_some(
+    virtual void write(
         absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) = 0;
 
     virtual any_io_executor get_executor() = 0;
     virtual void close() = 0;
 
-    template <typename BuffersT>
-    void async_read_some(
-        const BuffersT &buffers,
-        absl::AnyInvocable<void(std::error_code, size_t) &&> callback);
+    template <typename BuffersT, typename CallbackT>
+    void async_read_some(const BuffersT &buffers, CallbackT &&callback);
 
-    template <typename BuffersT>
-    void async_write_some(
-        const BuffersT &buffers,
-        absl::AnyInvocable<void(std::error_code, size_t) &&> callback);
+    template <typename BuffersT, typename CallbackT>
+    void async_write_some(const BuffersT &buffers, CallbackT &&callback);
 };
 
-template <typename BuffersT>
-void Stream::async_read_some(
-    const BuffersT &buffers,
-    absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
-    async_read_some(
+template <typename BuffersT, typename CallbackT>
+void Stream::async_read_some(const BuffersT &buffers, CallbackT &&callback) {
+    read(
         absl::Span<mutable_buffer const>(
             buffer_sequence_begin(buffers),
             buffer_sequence_end(buffers) - buffer_sequence_begin(buffers)),
-        std::move(callback));
+        std::forward<CallbackT>(callback));
 }
 
-template <typename BuffersT>
-void Stream::async_write_some(
-    const BuffersT &buffers,
-    absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
-    async_write_some(
+template <typename BuffersT, typename CallbackT>
+void Stream::async_write_some(const BuffersT &buffers, CallbackT &&callback) {
+    write(
         absl::Span<const_buffer const>(
             buffer_sequence_begin(buffers),
             buffer_sequence_end(buffers) - buffer_sequence_begin(buffers)),
-        std::move(callback));
+        std::forward<CallbackT>(callback));
 }
 
 }  // namespace proxy

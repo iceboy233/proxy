@@ -15,21 +15,18 @@ public:
     UdpSocketDatagram(const UdpSocketDatagram &) = delete;
     UdpSocketDatagram &operator=(const UdpSocketDatagram &) = delete;
 
-    void async_receive_from(
+    void receive_from(
         absl::Span<mutable_buffer const> buffers,
         udp::endpoint &endpoint,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
-    void async_send_to(
+    void send_to(
         absl::Span<const_buffer const> buffers,
         const udp::endpoint &endpoint,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
     any_io_executor get_executor() override { return socket_.get_executor(); }
     void close() override;
-
-    using Datagram::async_receive_from;
-    using Datagram::async_send_to;
 
     udp::socket &socket() { return socket_; }
     const udp::socket &socket() const { return socket_; }

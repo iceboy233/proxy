@@ -18,11 +18,11 @@ public:
     StdioStream(const StdioStream &) = delete;
     StdioStream &operator=(const StdioStream &) = delete;
 
-    void async_read_some(
+    void read(
         absl::Span<mutable_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
-    void async_write_some(
+    void write(
         absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 

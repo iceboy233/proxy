@@ -10,7 +10,7 @@ TcpSocketStream::TcpSocketStream(tcp::socket socket, TimerList &timer_list)
     : socket_(std::move(socket)),
       timer_(timer_list, [this]() { close(); }) {}
 
-void TcpSocketStream::async_read_some(
+void TcpSocketStream::read(
     absl::Span<mutable_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
     socket_.async_read_some(
@@ -19,7 +19,7 @@ void TcpSocketStream::async_read_some(
     timer_.update();
 }
 
-void TcpSocketStream::async_write_some(
+void TcpSocketStream::write(
     absl::Span<const_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
     socket_.async_write_some(

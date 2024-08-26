@@ -35,11 +35,11 @@ public:
         const_buffer initial_data,
         absl::AnyInvocable<void(std::error_code) &&> callback);
 
-    void async_read_some(
+    void read(
         absl::Span<mutable_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
-    void async_write_some(
+    void write(
         absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
@@ -49,7 +49,7 @@ public:
 private:
     void connect(absl::AnyInvocable<void(std::error_code) &&> callback);
 
-    void read(
+    void read_internal(
         absl::Span<mutable_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback);
 
@@ -310,14 +310,14 @@ void Connector::TcpStream::connect(
     }
 }
 
-void Connector::TcpStream::async_read_some(
+void Connector::TcpStream::read(
     absl::Span<mutable_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
     while (true) {
         switch (read_state_) {
         case ReadState::init:
             if (!decryptor_.init(connector_.pre_shared_key_)) {
-                read(buffers, std::move(callback));
+                read_internal(buffers, std::move(callback));
                 return;
             }
             if (!connector_.pre_shared_key_.method().is_spec_2022()) {
@@ -329,7 +329,7 @@ void Connector::TcpStream::async_read_some(
         case ReadState::header:
             if (!decryptor_.start_chunk(
                 connector_.pre_shared_key_.method().salt_size() + 11)) {
-                read(buffers, std::move(callback));
+                read_internal(buffers, std::move(callback));
                 return;
             }
             if (!connector_.salt_filter_.test_and_insert({
@@ -337,13 +337,13 @@ void Connector::TcpStream::async_read_some(
                 connector_.pre_shared_key_.method().salt_size()})) {
                 LOG(warning) << "duplicated salt";
                 decryptor_.discard();
-                read(buffers, std::move(callback));
+                read_internal(buffers, std::move(callback));
                 return;
             }
             if (decryptor_.pop_u8() != 1) {
                 LOG(warning) << "unexpected header type";
                 decryptor_.discard();
-                read(buffers, std::move(callback));
+                read_internal(buffers, std::move(callback));
                 return;
             }
             if (std::abs(static_cast<int64_t>(decryptor_.pop_big_u64()) -
@@ -352,7 +352,7 @@ void Connector::TcpStream::async_read_some(
                             .count()) > 30) {
                 LOG(warning) << "time difference too large";
                 decryptor_.discard();
-                read(buffers, std::move(callback));
+                read_internal(buffers, std::move(callback));
                 return;
             }
             if (memcmp(
@@ -362,7 +362,7 @@ void Connector::TcpStream::async_read_some(
                 connector_.pre_shared_key_.method().salt_size())) {
                 LOG(warning) << "salt mismatch";
                 decryptor_.discard();
-                read(buffers, std::move(callback));
+                read_internal(buffers, std::move(callback));
                 return;
             }
             read_length_ = decryptor_.pop_big_u16();
@@ -371,7 +371,7 @@ void Connector::TcpStream::async_read_some(
             continue;
         case ReadState::length:
             if (!decryptor_.start_chunk(2)) {
-                read(buffers, std::move(callback));
+                read_internal(buffers, std::move(callback));
                 return;
             }
             read_length_ = decryptor_.pop_big_u16();
@@ -380,7 +380,7 @@ void Connector::TcpStream::async_read_some(
             [[fallthrough]];
         case ReadState::payload:
             if (!decryptor_.start_chunk(read_length_)) {
-                read(buffers, std::move(callback));
+                read_internal(buffers, std::move(callback));
                 return;
             }
             read_buffer_ = {decryptor_.pop_buffer(read_length_), read_length_};
@@ -409,7 +409,7 @@ void Connector::TcpStream::async_read_some(
     }
 }
 
-void Connector::TcpStream::read(
+void Connector::TcpStream::read_internal(
     absl::Span<mutable_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
     absl::FixedArray<mutable_buffer, 1> buffers_copy(
@@ -429,7 +429,7 @@ void Connector::TcpStream::read(
         });
 }
 
-void Connector::TcpStream::async_write_some(
+void Connector::TcpStream::write(
     absl::Span<const_buffer const> buffers,
     absl::AnyInvocable<void(std::error_code, size_t) &&> callback) {
     size_t total_size = 0;

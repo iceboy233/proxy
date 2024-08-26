@@ -16,19 +16,16 @@ public:
     TcpSocketStream(const TcpSocketStream &) = delete;
     TcpSocketStream &operator=(const TcpSocketStream &) = delete;
 
-    void async_read_some(
+    void read(
         absl::Span<mutable_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
-    void async_write_some(
+    void write(
         absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
     any_io_executor get_executor() override { return socket_.get_executor(); }
     void close() override;
-
-    using Stream::async_read_some;
-    using Stream::async_write_some;
 
     tcp::socket &socket() { return socket_; }
     const tcp::socket &socket() const { return socket_; }

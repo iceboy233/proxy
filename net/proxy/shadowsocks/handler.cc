@@ -85,8 +85,8 @@ Handler::TcpConnection::TcpConnection(
 
 void Handler::TcpConnection::forward_read() {
     BufferSpan read_buffer = decryptor_.buffer();
-    stream_->async_read_some(
-        buffer(read_buffer.data(), read_buffer.size()),
+    stream_->read(
+        {{read_buffer.data(), read_buffer.size()}},
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, size_t size) {
             if (ec) {
@@ -340,7 +340,7 @@ void Handler::TcpConnection::forward_parse_host(size_t header_length) {
 void Handler::TcpConnection::forward_write() {
     async_write(
         *remote_stream_,
-        buffer(decryptor_.pop_buffer(read_length_), read_length_),
+        const_buffer(decryptor_.pop_buffer(read_length_), read_length_),
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, size_t) {
             if (ec) {
@@ -354,8 +354,8 @@ void Handler::TcpConnection::forward_write() {
 }
 
 void Handler::TcpConnection::backward_read() {
-    remote_stream_->async_read_some(
-        buffer(backward_read_buffer_.data(), backward_read_buffer_.size()),
+    remote_stream_->read(
+        {{backward_read_buffer_.data(), backward_read_buffer_.size()}},
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, size_t size) {
             if (ec) {
@@ -394,7 +394,7 @@ void Handler::TcpConnection::backward_write() {
     ConstBufferSpan write_buffer = encryptor_.buffer();
     async_write(
         *stream_,
-        buffer(write_buffer.data(), write_buffer.size()),
+        const_buffer(write_buffer.data(), write_buffer.size()),
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, size_t) {
             if (ec) {

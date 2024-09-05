@@ -51,8 +51,8 @@ void CopyBidirOperation::start() {
 }
 
 void CopyBidirOperation::forward_read() {
-    stream0_->async_read_some(
-        buffer(forward_buffer_.data(), forward_buffer_.size()),
+    stream0_->read(
+        {{forward_buffer_.data(), forward_buffer_.size()}},
         [this](std::error_code ec, size_t size) {
             if (ec) {
                 finish_one(ec);
@@ -66,7 +66,7 @@ void CopyBidirOperation::forward_read() {
 void CopyBidirOperation::forward_write() {
     async_write(
         *stream1_,
-        buffer(forward_buffer_.data(), forward_size_),
+        const_buffer(forward_buffer_.data(), forward_size_),
         [this](std::error_code ec, size_t) {
             if (ec) {
                 finish_one(ec);
@@ -77,8 +77,8 @@ void CopyBidirOperation::forward_write() {
 }
 
 void CopyBidirOperation::backward_read() {
-    stream1_->async_read_some(
-        buffer(backward_buffer_.data(), backward_buffer_.size()),
+    stream1_->read(
+        {{backward_buffer_.data(), backward_buffer_.size()}},
         [this](std::error_code ec, size_t size) {
             if (ec) {
                 finish_one(ec);
@@ -92,7 +92,7 @@ void CopyBidirOperation::backward_read() {
 void CopyBidirOperation::backward_write() {
     async_write(
         *stream0_,
-        buffer(backward_buffer_.data(), backward_size_),
+        const_buffer(backward_buffer_.data(), backward_size_),
         [this](std::error_code ec, size_t) {
             if (ec) {
                 finish_one(ec);

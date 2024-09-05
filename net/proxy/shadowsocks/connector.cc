@@ -415,8 +415,8 @@ void Connector::TcpStream::read_internal(
     absl::FixedArray<mutable_buffer, 1> buffers_copy(
         buffers.begin(), buffers.end());
     BufferSpan read_buffer = decryptor_.buffer();
-    base_stream_->async_read_some(
-        buffer(read_buffer.data(), read_buffer.size()),
+    base_stream_->read(
+        {{read_buffer.data(), read_buffer.size()}},
         [this, buffers = std::move(buffers_copy),
             callback = std::move(callback)](
             std::error_code ec, size_t size) mutable {
@@ -425,7 +425,7 @@ void Connector::TcpStream::read_internal(
                 return;
             }
             decryptor_.advance(size);
-            async_read_some(buffers, std::move(callback));
+            read(buffers, std::move(callback));
         });
 }
 
@@ -445,7 +445,7 @@ void Connector::TcpStream::write(
     ConstBufferSpan write_buffer = encryptor_.buffer();
     async_write(
         *base_stream_,
-        buffer(write_buffer.data(), write_buffer.size()),
+        const_buffer(write_buffer.data(), write_buffer.size()),
         [total_size, callback = std::move(callback)](
             std::error_code ec, size_t) mutable {
             if (ec) {

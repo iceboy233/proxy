@@ -133,8 +133,8 @@ ares_ssize_t TcpSocket::recvfrom(
         return -1;
     }
     read_buffer_.resize(buf_size);
-    stream_->async_read_some(
-        buffer(read_buffer_),
+    stream_->read(
+        {{read_buffer_.data(), buf_size}},
         [socket = boost::intrusive_ptr<TcpSocket>(this)](
             std::error_code ec, size_t size) {
             if (ec) {
@@ -164,7 +164,7 @@ ares_ssize_t TcpSocket::sendv(const iovec *data, int len) {
     }
     async_write(
         *stream_,
-        buffer(write_buffer_),
+        const_buffer(write_buffer_.data(), write_buffer_.size()),
         [socket = boost::intrusive_ptr<TcpSocket>(this)](
             std::error_code ec, size_t) {
             if (ec) {
@@ -240,8 +240,8 @@ ares_ssize_t UdpSocket::recvfrom(
         return -1;
     }
     receive_buffer_.resize(buf_size);
-    datagram_->async_receive_from(
-        buffer(receive_buffer_),
+    datagram_->receive_from(
+        {{receive_buffer_.data(), buf_size}},
         receive_endpoint_,
         [socket = boost::intrusive_ptr<UdpSocket>(this)](
             std::error_code ec, size_t size) {
@@ -279,8 +279,8 @@ void UdpSocket::send_next() {
     if (!datagram_) {
         return;
     }
-    datagram_->async_send_to(
-        const_buffer(send_queue_.front().data(), send_queue_.front().size()),
+    datagram_->send_to(
+        {{send_queue_.front().data(), send_queue_.front().size()}},
         send_endpoint_,
         [socket = boost::intrusive_ptr<UdpSocket>(this)](
             std::error_code, size_t) {

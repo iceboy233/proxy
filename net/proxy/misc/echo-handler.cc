@@ -50,8 +50,8 @@ StreamConnection::StreamConnection(std::unique_ptr<Stream> stream)
       buffer_(8192) {}
 
 void StreamConnection::read() {
-    stream_->async_read_some(
-        buffer(buffer_.data(), buffer_.size()),
+    stream_->read(
+        {{buffer_.data(), buffer_.size()}},
         [this](std::error_code ec, size_t size) {
             if (ec) {
                 finish();
@@ -65,7 +65,7 @@ void StreamConnection::read() {
 void StreamConnection::write() {
     async_write(
         *stream_,
-        buffer(buffer_.data(), size_),
+        const_buffer(buffer_.data(), size_),
         [this](std::error_code ec, size_t) {
             if (ec) {
                 finish();
@@ -80,8 +80,8 @@ DatagramConnection::DatagramConnection(std::unique_ptr<Datagram> datagram)
       buffer_(8192) {}
 
 void DatagramConnection::read() {
-    datagram_->async_receive_from(
-        buffer(buffer_.data(), buffer_.size()),
+    datagram_->receive_from(
+        {{buffer_.data(), buffer_.size()}},
         endpoint_,
         [this](std::error_code ec, size_t size) {
             if (ec) {
@@ -94,8 +94,8 @@ void DatagramConnection::read() {
 }
 
 void DatagramConnection::write() {
-    datagram_->async_send_to(
-        const_buffer(buffer_.data(), size_),
+    datagram_->send_to(
+        {{buffer_.data(), size_}},
         endpoint_,
         [this](std::error_code ec, size_t) {
             if (ec) {

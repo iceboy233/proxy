@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "absl/container/fixed_array.h"
+#include "net/proxy/util/write.h"
 
 namespace net {
 namespace proxy {
@@ -63,16 +64,13 @@ void StreamConnection::read() {
 }
 
 void StreamConnection::write() {
-    async_write(
-        *stream_,
-        const_buffer(buffer_.data(), size_),
-        [this](std::error_code ec, size_t) {
-            if (ec) {
-                finish();
-                return;
-            }
-            read();
-        });
+    proxy::write(*stream_, {buffer_.data(), size_}, [this](std::error_code ec) {
+        if (ec) {
+            finish();
+            return;
+        }
+        read();
+    });
 }
 
 DatagramConnection::DatagramConnection(std::unique_ptr<Datagram> datagram)

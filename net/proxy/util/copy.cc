@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "absl/container/fixed_array.h"
+#include "net/proxy/util/write.h"
 
 namespace net {
 namespace proxy {
@@ -64,10 +65,10 @@ void CopyBidirOperation::forward_read() {
 }
 
 void CopyBidirOperation::forward_write() {
-    async_write(
+    write(
         *stream1_,
-        const_buffer(forward_buffer_.data(), forward_size_),
-        [this](std::error_code ec, size_t) {
+        {forward_buffer_.data(), forward_size_},
+        [this](std::error_code ec) {
             if (ec) {
                 finish_one(ec);
                 return;
@@ -90,10 +91,10 @@ void CopyBidirOperation::backward_read() {
 }
 
 void CopyBidirOperation::backward_write() {
-    async_write(
+    write(
         *stream0_,
-        const_buffer(backward_buffer_.data(), backward_size_),
-        [this](std::error_code ec, size_t) {
+        {backward_buffer_.data(), backward_size_},
+        [this](std::error_code ec) {
             if (ec) {
                 finish_one(ec);
                 return;

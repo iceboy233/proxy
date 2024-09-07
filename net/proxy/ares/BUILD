@@ -32,6 +32,7 @@ cc_library(
     hdrs = ["socket.h"],
     deps = [
         "//net/proxy:interface",
+        "//net/proxy/util:write",
         "//third_party/cares",
         "@org_boost_boost//:smart_ptr",
         "@org_iceboy_trunk//net:asio",

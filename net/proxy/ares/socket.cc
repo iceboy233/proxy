@@ -2,6 +2,8 @@
 
 #include <utility>
 
+#include "net/proxy/util/write.h"
+
 #ifdef _WIN32
 struct iovec {
     void *iov_base;
@@ -162,11 +164,10 @@ ares_ssize_t TcpSocket::sendv(const iovec *data, int len) {
         SET_ERRNO(ENETUNREACH);
         return -1;
     }
-    async_write(
+    write(
         *stream_,
-        const_buffer(write_buffer_.data(), write_buffer_.size()),
-        [socket = boost::intrusive_ptr<TcpSocket>(this)](
-            std::error_code ec, size_t) {
+        write_buffer_,
+        [socket = boost::intrusive_ptr<TcpSocket>(this)](std::error_code ec) {
             if (ec) {
                 socket->stream_.reset();
             }

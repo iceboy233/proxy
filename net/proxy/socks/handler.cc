@@ -9,6 +9,7 @@
 #include "absl/container/fixed_array.h"
 #include "base/logging.h"
 #include "base/types.h"
+#include "net/proxy/util/write.h"
 
 namespace net {
 namespace proxy {
@@ -242,11 +243,11 @@ void Handler::TcpConnection::connect_host(ConstBufferSpan buffer) {
 }
 
 void Handler::TcpConnection::forward_write() {
-    async_write(
+    write(
         *remote_stream_,
-        const_buffer(forward_buffer_.data(), forward_size_),
+        {forward_buffer_.data(), forward_size_},
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
-            std::error_code ec, size_t) {
+            std::error_code ec) {
             if (ec) {
                 connection->close();
                 return;
@@ -272,11 +273,11 @@ void Handler::TcpConnection::reply() {
 }
 
 void Handler::TcpConnection::backward_write() {
-    async_write(
+    write(
         *stream_,
-        const_buffer(backward_buffer_.data(), backward_size_),
+        {backward_buffer_.data(), backward_size_},
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
-            std::error_code ec, size_t) {
+            std::error_code ec) {
             if (ec) {
                 connection->close();
                 return;

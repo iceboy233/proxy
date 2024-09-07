@@ -11,6 +11,7 @@
 #include "base/logging.h"
 #include "net/proxy/shadowsocks/decryptor.h"
 #include "net/proxy/shadowsocks/encryptor.h"
+#include "net/proxy/util/write.h"
 
 namespace net {
 namespace proxy {
@@ -338,11 +339,11 @@ void Handler::TcpConnection::forward_parse_host(size_t header_length) {
 }
 
 void Handler::TcpConnection::forward_write() {
-    async_write(
+    write(
         *remote_stream_,
-        const_buffer(decryptor_.pop_buffer(read_length_), read_length_),
+        {decryptor_.pop_buffer(read_length_), read_length_},
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
-            std::error_code ec, size_t) {
+            std::error_code ec) {
             if (ec) {
                 connection->close();
                 return;
@@ -391,12 +392,11 @@ void Handler::TcpConnection::backward_write() {
         encryptor_.write_payload_chunk(read_buffer.subspan(0, chunk_size));
         read_buffer.remove_prefix(chunk_size);
     } while (!read_buffer.empty());
-    ConstBufferSpan write_buffer = encryptor_.buffer();
-    async_write(
+    write(
         *stream_,
-        const_buffer(write_buffer.data(), write_buffer.size()),
+        encryptor_.buffer(),
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
-            std::error_code ec, size_t) {
+            std::error_code ec) {
             if (ec) {
                 connection->close();
                 return;

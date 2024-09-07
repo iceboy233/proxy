@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "absl/strings/str_cat.h"
+#include "net/proxy/util/write.h"
 
 namespace net {
 namespace proxy {
@@ -121,11 +122,11 @@ void Connector::send_initial_data(
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
     TcpSocketStream &stream_ref = *stream;
-    async_write(
+    write(
         stream_ref,
-        initial_data,
+        {initial_data.data(), initial_data.size()},
         [stream = std::move(stream), callback = std::move(callback)](
-            std::error_code ec, size_t) mutable {
+            std::error_code ec) mutable {
         if (ec) {
             std::move(callback)(ec, nullptr);
             return;

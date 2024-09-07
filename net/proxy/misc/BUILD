@@ -19,6 +19,7 @@ cc_library(
     hdrs = ["echo-handler.h"],
     deps = [
         "//net/proxy:interface",
+        "//net/proxy/util:write",
         "@com_google_absl//absl/container:fixed_array",
     ],
 )

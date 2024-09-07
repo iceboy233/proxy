@@ -8,6 +8,7 @@
 #include "net/proxy/shadowsocks/decryptor.h"
 #include "net/proxy/shadowsocks/encryptor.h"
 #include "net/proxy/stream.h"
+#include "net/proxy/util/write.h"
 
 namespace net {
 namespace proxy {
@@ -442,12 +443,11 @@ void Connector::TcpStream::write(
         encryptor_.write_payload_chunk({buffer.data(), buffer.size()});
         total_size += buffer.size();
     }
-    ConstBufferSpan write_buffer = encryptor_.buffer();
-    async_write(
+    proxy::write(
         *base_stream_,
-        const_buffer(write_buffer.data(), write_buffer.size()),
+        encryptor_.buffer(),
         [total_size, callback = std::move(callback)](
-            std::error_code ec, size_t) mutable {
+            std::error_code ec) mutable {
             if (ec) {
                 std::move(callback)(ec, 0);
                 return;

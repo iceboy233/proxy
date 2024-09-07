@@ -21,6 +21,7 @@ cc_library(
         ":udp-socket-datagram",
         "//net/proxy:interface",
         "//net/proxy/ares:resolver",
+        "//net/proxy/util:write",
         "@com_google_absl//absl/strings",
         "@org_iceboy_trunk//net:asio",
         "@org_iceboy_trunk//net:timer-list",

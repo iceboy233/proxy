@@ -25,7 +25,6 @@ public:
         const udp::endpoint &endpoint,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
-    any_io_executor get_executor() override { return socket_.get_executor(); }
     void close() override;
 
     udp::socket &socket() { return socket_; }

@@ -10,7 +10,7 @@ namespace proxy {
 namespace system {
 
 StdioStream::StdioStream(const any_io_executor &executor)
-    : executor_(executor),
+    :
 #ifndef _WIN32
       stdin_(executor, STDIN_FILENO),
       stdout_(executor, STDOUT_FILENO)

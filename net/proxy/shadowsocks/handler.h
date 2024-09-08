@@ -13,9 +13,8 @@ namespace shadowsocks {
 
 class Handler : public proxy::Handler {
 public:
-    Handler(
-        const any_io_executor &executor,
-        proxy::Connector &connector);
+    explicit Handler(proxy::Connector &connector)
+        : connector_(connector) {}
 
     struct InitOptions {
         const Method *method = &Method::aes_128_gcm();

@@ -19,9 +19,8 @@ namespace shadowsocks {
 
 class Connector : public proxy::Connector {
 public:
-    Connector(
-        const any_io_executor &executor,
-        proxy::Connector &base_connector);
+    explicit Connector(proxy::Connector &base_connector)
+        : base_connector_(base_connector) {}
 
     Connector(const Connector &) = delete;
     Connector &operator=(const Connector &) = delete;
@@ -63,7 +62,6 @@ public:
 private:
     class TcpStream;
 
-    any_io_executor executor_;
     proxy::Connector &base_connector_;
     std::vector<Endpoint> endpoints_;
     std::vector<Endpoint>::iterator endpoints_iter_;

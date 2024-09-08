@@ -29,7 +29,7 @@ REGISTER_HANDLER(shadowsocks, [](
         LOG(error) << "invalid connector: " << connector_str;
         return nullptr;
     }
-    auto handler = std::make_unique<Handler>(proxy.executor(), *connector);
+    auto handler = std::make_unique<Handler>(*connector);
     if (!handler->init(options)) {
         LOG(error) << "init failed";
         return nullptr;
@@ -67,8 +67,7 @@ REGISTER_CONNECTOR(shadowsocks, [](
         LOG(error) << "invalid connector: " << connector_str;
         return nullptr;
     }
-    auto connector = std::make_unique<Connector>(
-        proxy.executor(), *base_connector);
+    auto connector = std::make_unique<Connector>(*base_connector);
     if (!connector->init(options)) {
         LOG(error) << "init failed";
         return nullptr;

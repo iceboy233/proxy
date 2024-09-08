@@ -44,7 +44,6 @@ public:
         absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
-    any_io_executor get_executor() override { return connector_.executor_; }
     void close() override { base_stream_->close(); }
 
 private:
@@ -70,12 +69,6 @@ private:
     uint16_t read_length_;
     ConstBufferSpan read_buffer_;
 };
-
-Connector::Connector(
-    const any_io_executor &executor,
-    proxy::Connector &base_connector)
-    : executor_(executor),
-      base_connector_(base_connector) {}
 
 bool Connector::init(const InitOptions &options) {
     endpoints_ = options.endpoints;

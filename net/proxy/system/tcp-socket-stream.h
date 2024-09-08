@@ -24,7 +24,6 @@ public:
         absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
-    any_io_executor get_executor() override { return socket_.get_executor(); }
     void close() override;
 
     tcp::socket &socket() { return socket_; }

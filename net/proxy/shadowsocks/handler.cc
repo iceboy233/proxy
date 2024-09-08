@@ -55,11 +55,6 @@ private:
     bool write_header_;
 };
 
-Handler::Handler(
-    const any_io_executor &executor,
-    proxy::Connector &connector)
-    : connector_(connector) {}
-
 bool Handler::init(const InitOptions &options) {
     return pre_shared_key_.init(*options.method, options.password);
 }

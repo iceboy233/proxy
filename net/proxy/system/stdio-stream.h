@@ -26,11 +26,9 @@ public:
         absl::Span<const_buffer const> buffers,
         absl::AnyInvocable<void(std::error_code, size_t) &&> callback) override;
 
-    any_io_executor get_executor() override { return executor_; }
     void close() override;
 
 private:
-    any_io_executor executor_;
 #ifndef _WIN32
     readable_pipe stdin_;
     writable_pipe stdout_;

@@ -23,7 +23,6 @@ class H2Connection {
 public:
     struct Options {
         size_t read_buffer_size = 65536;
-        size_t write_buffer_size = 65536;
     };
 
     H2Connection(Stream &stream, const Options &options);
@@ -69,7 +68,6 @@ private:
     Stream &stream_;
     nghttp2_session *session_;
     absl::FixedArray<uint8_t, 0> read_buffer_;
-    absl::FixedArray<uint8_t, 0> write_buffer_;
     bool writing_ = false;
     absl::flat_hash_map<int32_t, ResponseStream> response_streams_;
 };

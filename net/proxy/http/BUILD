@@ -4,6 +4,7 @@ cc_library(
     hdrs = ["h2-connection.h"],
     deps = [
         "//net/proxy:interface",
+        "//net/proxy/util:write",
         "//third_party/nghttp2",
         "@com_google_absl//absl/container:fixed_array",
         "@com_google_absl//absl/container:flat_hash_map",

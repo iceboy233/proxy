@@ -1,6 +1,7 @@
 #include "net/proxy/http/h2-connection.h"
 
 #include "base/logging.h"
+#include "net/proxy/util/write.h"
 #include "util/strings.h"
 
 namespace net {
@@ -22,8 +23,7 @@ void populate_nv(
 
 H2Connection::H2Connection(Stream &stream, const Options &options)
     : stream_(stream),
-      read_buffer_(options.read_buffer_size),
-      write_buffer_(options.write_buffer_size) {
+      read_buffer_(options.read_buffer_size) {
     nghttp2_session_callbacks *callbacks;
     if (nghttp2_session_callbacks_new(&callbacks)) {
         abort();
@@ -71,8 +71,8 @@ void H2Connection::request(
 }
 
 void H2Connection::read() {
-    stream_.async_read_some(
-        mutable_buffer(read_buffer_.data(), read_buffer_.size()),
+    stream_.read(
+        {{read_buffer_.data(), read_buffer_.size()}},
         [this](std::error_code ec, size_t size) {
             if (ec) {
                 LOG(error) << "async_read_some failed: " << ec;
@@ -104,36 +104,24 @@ void H2Connection::maybe_write() {
 }
 
 void H2Connection::write() {
-    size_t write_size = 0;
+    // TODO: Buffer writes.
     const uint8_t *data;
-    nghttp2_ssize data_size;
-    while ((data_size = nghttp2_session_mem_send2(session_, &data)) > 0 &&
-           write_size + data_size <= write_buffer_.size()) {
-        memcpy(&write_buffer_[write_size], data, data_size);
-        write_size += data_size;
-    }
+    nghttp2_ssize data_size = nghttp2_session_mem_send2(session_, &data);
     if (data_size < 0) {
         LOG(error) << "nghttp2_session_mem_send2 failed: " << data_size;
         writing_ = false;
         return;
     }
-    if (!write_size && !data_size) {
+    if (!data_size) {
         writing_ = false;
         return;
     }
-    std::vector<const_buffer> buffers;
-    if (write_size) {
-        buffers.emplace_back(&write_buffer_[0], write_size);
-    }
-    if (data_size) {
-        buffers.emplace_back(data, data_size);
-    }
-    async_write(
+    proxy::write(
         stream_,
-        buffers,
-        [this](std::error_code ec, size_t) {
+        {data, static_cast<size_t>(data_size)},
+        [this](std::error_code ec) {
             if (ec) {
-                LOG(error) << "async_write failed: " << ec;
+                LOG(error) << "write failed: " << ec;
                 writing_ = false;
                 return;
             }

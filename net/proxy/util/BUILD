@@ -13,6 +13,15 @@ cc_library(
 )
 
 cc_library(
+    name = "stream-wrapper",
+    hdrs = ["stream-wrapper.h"],
+    deps = [
+        "//net/proxy:interface",
+        "@org_iceboy_trunk//net:asio",
+    ],
+)
+
+cc_library(
     name = "write",
     srcs = ["write.cc"],
     hdrs = ["write.h"],

@@ -14,3 +14,15 @@ cc_library(
         "@org_iceboy_trunk//util:strings",
     ],
 )
+
+cc_library(
+    name = "tls-stream",
+    srcs = ["tls-stream.cc"],
+    hdrs = ["tls-stream.h"],
+    deps = [
+        "//net/proxy:interface",
+        "//net/proxy/util:stream-wrapper",
+        "@boringssl//:ssl",
+        "@com_google_absl//absl/container:fixed_array",
+    ],
+)

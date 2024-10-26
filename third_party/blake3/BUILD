@@ -8,14 +8,14 @@ cc_library(
         "blake3_impl.h",
         "blake3_portable.c",
     ] + select({
-        ":linux_amd64": [
+        ":linux_x86_64": [
             "blake3_sse2_x86-64_unix.S",
             "blake3_sse41_x86-64_unix.S",
             "blake3_avx2_x86-64_unix.S",
             "blake3_avx512_x86-64_unix.S",
         ],
-        ":linux_arm64": ["blake3_neon.c"],
-        ":windows_amd64": [
+        ":linux_aarch64": ["blake3_neon.c"],
+        ":windows_x86_64": [
             "blake3_sse2_x86-64_windows_msvc.asm",
             "blake3_sse41_x86-64_windows_msvc.asm",
             "blake3_avx2_x86-64_windows_msvc.asm",
@@ -25,27 +25,20 @@ cc_library(
     hdrs = ["blake3.h"],
 )
 
-# TODO: Move this to a shared place.
 config_setting(
-    name = "linux_amd64",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:linux",
-    ],
+    name = "linux_x86_64",
+    values = {"cpu": "k8"},
+    constraint_values = ["@platforms//os:linux"],
 )
 
 config_setting(
-    name = "linux_arm64",
-    constraint_values = [
-        "@platforms//cpu:arm64",
-        "@platforms//os:linux",
-    ],
+    name = "linux_aarch64",
+    values = {"cpu": "aarch64"},
+    constraint_values = ["@platforms//os:linux"],
 )
 
 config_setting(
-    name = "windows_amd64",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:windows",
-    ],
+    name = "windows_x86_64",
+    values = {"cpu": "x64_windows_msvc"},
+    constraint_values = ["@platforms//os:windows"],
 )

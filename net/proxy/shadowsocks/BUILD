@@ -7,7 +7,7 @@ cc_library(
         ":connector",
         ":handler",
         "//net/proxy",
-        "@org_boost_boost//:property_tree",
+        "//net/proxy/util:config",
         "@org_iceboy_trunk//base:logging",
     ],
     alwayslink = 1,

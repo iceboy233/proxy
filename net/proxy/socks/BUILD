@@ -6,8 +6,8 @@ cc_library(
     deps = [
         ":handler",
         "//net/proxy",
+        "//net/proxy/util:config",
         "@org_iceboy_trunk//base:logging",
-        "@org_boost_boost//:property_tree",
     ],
     alwayslink = 1,
 )

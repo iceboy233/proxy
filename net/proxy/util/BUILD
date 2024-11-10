@@ -1,6 +1,17 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@org_boost_boost//:property_tree",
+        "@org_iceboy_trunk//base:logging",
+    ],
+)
+
+cc_library(
     name = "copy",
     srcs = ["copy.cc"],
     hdrs = ["copy.h"],

@@ -1,54 +1,67 @@
 #include <memory>
+#include <string>
 #include <utility>
-#include <boost/property_tree/ptree.hpp>
+#include <vector>
 
 #include "base/logging.h"
 #include "net/proxy/proxy.h"
 #include "net/proxy/registry.h"
 #include "net/proxy/route/connector.h"
+#include "net/proxy/util/config.h"
 
 namespace net {
 namespace proxy {
+
+struct RouteConnectorRuleConfig {
+    std::vector<std::string> host;
+    std::vector<std::string> host_suffix;
+    bool default_ = false;
+    bool drop = false;
+    std::string connector;
+};
+
+template <>
+struct ConfigVisitor<RouteConnectorRuleConfig> {
+    template <typename V>
+    void operator()(V &&v, RouteConnectorRuleConfig &c) const {
+        v("host", c.host);
+        v("host-suffix", c.host_suffix);
+        v("default", c.default_);
+        v("drop", c.drop);
+        v("connector", c.connector);
+    }
+};
+
+struct RouteConnectorConfig {
+    std::vector<RouteConnectorRuleConfig> rule;
+};
+
+template <>
+struct ConfigVisitor<RouteConnectorConfig> {
+    template <typename V>
+    void operator()(V &&v, RouteConnectorConfig &c) const {
+        v("rule", c.rule);
+    }
+};
+
 namespace route {
 namespace {
 
-Connector::Rule parse_rule(
-    Proxy &proxy,
-    const boost::property_tree::ptree &rule_config) {
-    Connector::Rule rule;
-    for (auto iters = rule_config.equal_range("host");
-         iters.first != iters.second;
-         ++iters.first) {
-        std::string host = iters.first->second.get_value<std::string>();
-        rule.hosts.push_back(std::move(host));
-    }
-    for (auto iters = rule_config.equal_range("host-suffix");
-         iters.first != iters.second;
-         ++iters.first) {
-        std::string host_suffix = iters.first->second.get_value<std::string>();
-        rule.host_suffixes.push_back(std::move(host_suffix));
-    }
-    if (rule_config.get<bool>("default", false)) {
-        rule.is_default = true;
-    }
-    if (!rule_config.get<bool>("drop", false)) {
-        std::string connector = rule_config.get<std::string>("connector", "");
-        rule.connector = proxy.get_connector(connector);
-        if (!rule.connector) {
-            LOG(error) << "invalid connector: " << connector;
-        }
-    }
-    return rule;
-}
-
-REGISTER_CONNECTOR(route, [](
-    Proxy &proxy,
-    const boost::property_tree::ptree &config) -> std::unique_ptr<Connector> {
+REGISTER_CONNECTOR(route, [](Proxy &proxy, const auto &ptree) {
+    auto config = parse_connector_config<RouteConnectorConfig>(ptree);
     std::vector<Connector::Rule> rules;
-    for (auto iters = config.equal_range("rule");
-         iters.first != iters.second;
-         ++iters.first) {
-        rules.push_back(parse_rule(proxy, iters.first->second));
+    for (const RouteConnectorRuleConfig &rule_config : config.rule) {
+        Connector::Rule rule;
+        rule.hosts = rule_config.host;
+        rule.host_suffixes = rule_config.host_suffix;
+        rule.is_default = rule_config.default_;
+        if (!rule_config.drop) {
+            rule.connector = proxy.get_connector(rule_config.connector);
+            if (!rule.connector) {
+                LOG(error) << "invalid connector: " << rule_config.connector;
+            }
+        }
+        rules.push_back(std::move(rule));
     }
     return std::make_unique<Connector>(rules);
 });

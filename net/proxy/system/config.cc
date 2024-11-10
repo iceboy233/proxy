@@ -1,39 +1,66 @@
 #include <chrono>
 #include <memory>
-#include <boost/property_tree/ptree.hpp>
+#include <string>
+#include <vector>
 
 #include "base/logging.h"
 #include "net/proxy/ares/resolver.h"
 #include "net/proxy/proxy.h"
 #include "net/proxy/registry.h"
 #include "net/proxy/system/connector.h"
+#include "net/proxy/util/config.h"
 
 namespace net {
 namespace proxy {
+
+struct ResolverConfig {
+    std::vector<std::string> server;
+    std::string address_family = "prefer-v4";
+};
+
+template <>
+struct ConfigVisitor<ResolverConfig> {
+    template <typename V>
+    void operator()(V &&v, ResolverConfig &c) const {
+        v("server", c.server);
+        v("address-family", c.address_family);
+    }
+};
+
+struct SystemConnectorConfig {
+    double timeout = 300;
+    bool tcp_no_delay = true;
+    ResolverConfig resolver;
+};
+
+template <>
+struct ConfigVisitor<SystemConnectorConfig> {
+    template <typename V>
+    void operator()(V &&v, SystemConnectorConfig &c) const {
+        v("timeout", c.timeout);
+        v("tcp-no-delay", c.tcp_no_delay);
+        v("resolver", c.resolver);
+    }
+};
+
 namespace system {
 namespace {
 
-REGISTER_CONNECTOR(system, [](
-    Proxy &proxy, const boost::property_tree::ptree &config) {
+REGISTER_CONNECTOR(system, [](Proxy &proxy, const auto &ptree) {
+    auto config = parse_connector_config<SystemConnectorConfig>(ptree);
     Connector::Options options;
     options.timeout = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::duration<double>(config.get<double>("timeout", 300)));
-    options.tcp_no_delay = config.get<bool>("tcp_no_delay", true);
-    const boost::property_tree::ptree empty_ptree;
-    const auto &resolver_config = config.get_child("resolver", empty_ptree);
-    for (auto iters = resolver_config.equal_range("server");
-         iters.first != iters.second;
-         ++iters.first) {
-        std::string server_str = iters.first->second.get_value<std::string>();
-        auto server_endpoint = Endpoint::from_string(server_str);
+        std::chrono::duration<double>(config.timeout));
+    options.tcp_no_delay = config.tcp_no_delay;
+    for (const std::string &server : config.resolver.server) {
+        auto server_endpoint = Endpoint::from_string(server);
         if (!server_endpoint) {
-            LOG(error) << "invalid server: " << server_str;
+            LOG(error) << "invalid server: " << server;
             continue;
         }
         options.resolver_options.servers.push_back(*server_endpoint);
     }
-    auto address_family = resolver_config.get<std::string>(
-        "address-family", "prefer-v4");
+    const std::string &address_family = config.resolver.address_family;
     if (address_family == "prefer-v4") {
         options.resolver_options.address_family =
             ares::Resolver::AddressFamily::prefer_v4;

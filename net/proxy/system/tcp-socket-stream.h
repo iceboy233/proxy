@@ -2,8 +2,8 @@
 #define _NET_PROXY_SYSTEM_TCP_SOCKET_STREAM_H
 
 #include "net/asio.h"
-#include "net/proxy/stream.h"
 #include "net/timer-list.h"
+#include "net/interface/stream.h"
 
 namespace net {
 namespace proxy {

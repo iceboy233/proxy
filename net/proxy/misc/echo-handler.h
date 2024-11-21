@@ -1,7 +1,7 @@
 #ifndef _NET_PROXY_MISC_ECHO_HANDLER_H
 #define _NET_PROXY_MISC_ECHO_HANDLER_H
 
-#include "net/proxy/handler.h"
+#include "net/interface/handler.h"
 
 namespace net {
 namespace proxy {

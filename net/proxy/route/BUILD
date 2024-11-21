@@ -18,7 +18,7 @@ cc_library(
     hdrs = ["connector.h"],
     deps = [
         ":host-matcher",
-        "//net/proxy:interface",
+        "@org_iceboy_trunk//net/interface",
     ],
 )
 

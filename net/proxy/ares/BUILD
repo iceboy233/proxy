@@ -14,7 +14,6 @@ cc_library(
     deps = [
         ":error-category",
         ":socket",
-        "//net/proxy:interface",
         "//third_party/cares",
         "//util:int-allocator",
         "@com_google_absl//absl/container:flat_hash_map",
@@ -23,6 +22,7 @@ cc_library(
         "@org_iceboy_trunk//net:asio",
         "@org_iceboy_trunk//net:endpoint",
         "@org_iceboy_trunk//net:timer-list",
+        "@org_iceboy_trunk//net/interface",
     ],
 )
 
@@ -31,10 +31,10 @@ cc_library(
     srcs = ["socket.cc"],
     hdrs = ["socket.h"],
     deps = [
-        "//net/proxy:interface",
         "//net/proxy/util:write",
         "//third_party/cares",
         "@org_boost_boost//:smart_ptr",
         "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net/interface",
     ],
 )

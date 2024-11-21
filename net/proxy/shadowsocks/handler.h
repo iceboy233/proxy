@@ -2,8 +2,8 @@
 #define _NET_PROXY_SHADOWSOCKS_HANDLER_H
 
 #include "net/asio.h"
-#include "net/proxy/connector.h"
-#include "net/proxy/handler.h"
+#include "net/interface/connector.h"
+#include "net/interface/handler.h"
 #include "net/proxy/shadowsocks/pre-shared-key.h"
 #include "net/proxy/shadowsocks/salt-filter.h"
 
@@ -11,9 +11,9 @@ namespace net {
 namespace proxy {
 namespace shadowsocks {
 
-class Handler : public proxy::Handler {
+class Handler : public net::Handler {
 public:
-    explicit Handler(proxy::Connector &connector)
+    explicit Handler(net::Connector &connector)
         : connector_(connector) {}
 
     struct InitOptions {
@@ -29,7 +29,7 @@ public:
 private:
     class TcpConnection;
 
-    proxy::Connector &connector_;
+    net::Connector &connector_;
     PreSharedKey pre_shared_key_;
     SaltFilter salt_filter_;
 };

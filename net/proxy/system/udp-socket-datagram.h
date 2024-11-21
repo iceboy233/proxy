@@ -2,7 +2,7 @@
 #define _NET_PROXY_SYSTEM_UDP_SOCKET_DATAGRAM_H
 
 #include "net/asio.h"
-#include "net/proxy/datagram.h"
+#include "net/interface/datagram.h"
 
 namespace net {
 namespace proxy {

@@ -12,9 +12,9 @@
 #include "absl/types/span.h"
 #include "net/asio.h"
 #include "net/endpoint.h"
-#include "net/proxy/ares/socket.h"
-#include "net/proxy/connector.h"
 #include "net/timer-list.h"
+#include "net/interface/connector.h"
+#include "net/proxy/ares/socket.h"
 #include "util/int-allocator.h"
 
 namespace net {
@@ -64,7 +64,7 @@ private:
     static const ares_socket_functions funcs_;
 
     any_io_executor executor_;
-    proxy::Connector &connector_;
+    Connector &connector_;
     ares_channel channel_ = nullptr;
     steady_timer wait_timer_;
     TimerList cache_timer_list_;

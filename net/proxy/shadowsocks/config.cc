@@ -64,7 +64,7 @@ REGISTER_HANDLER(shadowsocks, [](
         return nullptr;
     }
     options.password = config.password;
-    proxy::Connector *connector = proxy.get_connector(config.connector);
+    net::Connector *connector = proxy.get_connector(config.connector);
     if (!connector) {
         LOG(error) << "invalid connector: " << config.connector;
         return nullptr;
@@ -97,7 +97,7 @@ REGISTER_CONNECTOR(shadowsocks, [](
     options.password = config.password;
     options.min_padding_length = config.min_padding_length;
     options.max_padding_length = config.max_padding_length;
-    proxy::Connector *base_connector = proxy.get_connector(config.connector);
+    net::Connector *base_connector = proxy.get_connector(config.connector);
     if (!base_connector) {
         LOG(error) << "invalid connector: " << config.connector;
         return nullptr;

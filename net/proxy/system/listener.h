@@ -5,8 +5,8 @@
 
 #include "net/asio.h"
 #include "net/endpoint.h"
-#include "net/proxy/handler.h"
 #include "net/timer-list.h"
+#include "net/interface/handler.h"
 
 namespace net {
 namespace proxy {

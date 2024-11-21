@@ -16,31 +16,15 @@ Connector::Connector(const any_io_executor &executor, const Options &options)
       timer_list_(executor_, options.timeout),
       tcp_no_delay_(options.tcp_no_delay) {}
 
-void Connector::connect_tcp_v4(
-    const address_v4 &address,
-    uint16_t port,
+void Connector::connect(
+    const tcp::endpoint &endpoint,
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    connect_tcp(
-        std::array<tcp::endpoint, 1>({tcp::endpoint(address, port)}),
-        initial_data,
-        std::move(callback));
+    connect_internal({endpoint}, initial_data, std::move(callback));
 }
 
-void Connector::connect_tcp_v6(
-    const address_v6 &address,
-    uint16_t port,
-    const_buffer initial_data,
-    absl::AnyInvocable<void(
-        std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    connect_tcp(
-        std::array<tcp::endpoint, 1>({tcp::endpoint(address, port)}),
-        initial_data,
-        std::move(callback));
-}
-
-void Connector::connect_tcp_host(
+void Connector::connect(
     std::string_view host,
     uint16_t port,
     const_buffer initial_data,
@@ -59,14 +43,19 @@ void Connector::connect_tcp_host(
         for (const auto &address : addresses) {
             endpoints.push_back(tcp::endpoint(address, port));
         }
-        connect_tcp(endpoints, initial_data, std::move(callback));
+        connect_internal(endpoints, initial_data, std::move(callback));
     });
 }
 
-std::error_code Connector::bind_udp_v4(std::unique_ptr<Datagram> &datagram) {
+std::error_code Connector::bind(
+    const udp::endpoint &endpoint, std::unique_ptr<Datagram> &datagram) {
     udp::socket socket(executor_);
     boost::system::error_code ec;
-    socket.open(udp::v4(), ec);
+    socket.open(endpoint.protocol(), ec);
+    if (ec) {
+        return ec;
+    }
+    socket.bind(endpoint, ec);
     if (ec) {
         return ec;
     }
@@ -74,20 +63,8 @@ std::error_code Connector::bind_udp_v4(std::unique_ptr<Datagram> &datagram) {
     return {};
 }
 
-std::error_code Connector::bind_udp_v6(std::unique_ptr<Datagram> &datagram) {
-    udp::socket socket(executor_);
-    boost::system::error_code ec;
-    socket.open(udp::v6(), ec);
-    if (ec) {
-        return ec;
-    }
-    datagram = std::make_unique<UdpSocketDatagram>(std::move(socket));
-    return {};
-}
-
-template <typename EndpointsT>
-void Connector::connect_tcp(
-    const EndpointsT &endpoints,
+void Connector::connect_internal(
+    absl::Span<tcp::endpoint const> endpoints,
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {

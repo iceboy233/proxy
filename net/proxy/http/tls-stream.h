@@ -2,7 +2,7 @@
 #define _NET_PROXY_HTTP_TLS_STREAM_H
 
 #include "boost/asio/ssl.hpp"
-#include "net/proxy/stream.h"
+#include "net/interface/stream.h"
 #include "net/proxy/util/stream-wrapper.h"
 
 namespace net {

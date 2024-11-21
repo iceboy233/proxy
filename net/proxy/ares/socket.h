@@ -8,9 +8,9 @@
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
 #include "net/asio.h"
-#include "net/proxy/connector.h"
-#include "net/proxy/datagram.h"
-#include "net/proxy/stream.h"
+#include "net/interface/connector.h"
+#include "net/interface/datagram.h"
+#include "net/interface/stream.h"
 
 namespace net {
 namespace proxy {

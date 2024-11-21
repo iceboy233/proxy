@@ -207,10 +207,8 @@ void Handler::TcpConnection::forward_parse_ipv4(size_t header_length) {
     const_buffer initial_data(
         decryptor_.pop_buffer(initial_data_length),
         initial_data_length);
-    handler_.connector_.connect_tcp_v4(
-        address_v4(address_bytes),
-        port,
-        initial_data,
+    handler_.connector_.connect(
+        {address_v4(address_bytes), port}, initial_data,
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {
@@ -259,10 +257,8 @@ void Handler::TcpConnection::forward_parse_ipv6(size_t header_length) {
     const_buffer initial_data(
         decryptor_.pop_buffer(initial_data_length),
         initial_data_length);
-    handler_.connector_.connect_tcp_v6(
-        address_v6(address_bytes),
-        port,
-        initial_data,
+    handler_.connector_.connect(
+        {address_v6(address_bytes), port}, initial_data,
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {
@@ -311,10 +307,8 @@ void Handler::TcpConnection::forward_parse_host(size_t header_length) {
     const_buffer initial_data(
         decryptor_.pop_buffer(initial_data_length),
         initial_data_length);
-    handler_.connector_.connect_tcp_host(
-        host,
-        port,
-        initial_data,
+    handler_.connector_.connect(
+        host, port, initial_data,
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {

@@ -48,11 +48,11 @@ bool tcp_connect(Proxy &proxy) {
         LOG(fatal) << "invalid connector";
         return false;
     }
-    connector->connect_tcp_host(
+    connector->connect(
         host, port, {},
         [&proxy](std::error_code ec, std::unique_ptr<Stream> remote_stream) {
             if (ec) {
-                LOG(error) << "connect_tcp_host failed: " << ec;
+                LOG(error) << "connect failed: " << ec;
                 return;
             }
             auto stdio_stream = std::make_unique<system::StdioStream>(

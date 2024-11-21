@@ -17,7 +17,6 @@ cc_library(
     srcs = ["handler.cc"],
     hdrs = ["handler.h"],
     deps = [
-        "//net/proxy:interface",
         "//net/proxy/util:write",
         "@com_google_absl//absl/algorithm",
         "@com_google_absl//absl/container:fixed_array",
@@ -25,5 +24,6 @@ cc_library(
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//base:types",
         "@org_iceboy_trunk//net:asio",
+        "@org_iceboy_trunk//net/interface",
     ],
 )

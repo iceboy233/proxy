@@ -100,13 +100,7 @@ int TcpSocket::connect(const sockaddr *addr, ares_socklen_t addr_len) {
         }
         ares_process_fd(socket->channel_, socket->fd_, socket->fd_);
     };
-    if (address.is_v4()) {
-        connector_.connect_tcp_v4(
-            address.to_v4(), port, {}, std::move(callback));
-    } else {
-        connector_.connect_tcp_v6(
-            address.to_v6(), port, {}, std::move(callback));
-    }
+    connector_.connect({address, port}, {}, std::move(callback));
     SET_ERRNO(EINPROGRESS);
     return -1;
 }
@@ -198,16 +192,11 @@ int UdpSocket::connect(const sockaddr *addr, ares_socklen_t addr_len) {
         SET_ERRNO(EINVAL);
         return -1;
     }
-    if (address.is_v4()) {
-        if (connector_.bind_udp_v4(datagram_)) {
-            return -1;
-        }
-    } else {
-        if (connector_.bind_udp_v6(datagram_)) {
-            return -1;
-        }
+    udp::endpoint endpoint(address, port);
+    if (connector_.bind({endpoint.protocol(), 0}, datagram_)) {
+        return -1;
     }
-    send_endpoint_ = udp::endpoint(address, port);
+    send_endpoint_ = endpoint;
     post(executor_, [socket = boost::intrusive_ptr<UdpSocket>(this)]() {
         ares_process_fd(socket->channel_, socket->fd_, socket->fd_);
     });

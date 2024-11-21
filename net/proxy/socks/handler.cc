@@ -53,7 +53,7 @@ private:
     size_t backward_size_;
 };
 
-Handler::Handler(const any_io_executor &executor, proxy::Connector &connector)
+Handler::Handler(const any_io_executor &executor, net::Connector &connector)
     : connector_(connector) {}
 
 void Handler::handle_stream(std::unique_ptr<Stream> stream) {
@@ -170,10 +170,9 @@ void Handler::TcpConnection::connect_ipv4(ConstBufferSpan buffer) {
     buffer.remove_prefix(6);
     forward_size_ = 0;
     state_ = State::connect;
-    handler_.connector_.connect_tcp_v4(
-        address_v4(address_bytes),
-        port,
-        net::buffer(buffer.data(), buffer.size()),
+    handler_.connector_.connect(
+        {address_v4(address_bytes), port},
+        {buffer.data(), buffer.size()},
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {
@@ -196,10 +195,9 @@ void Handler::TcpConnection::connect_ipv6(ConstBufferSpan buffer) {
     buffer.remove_prefix(18);
     forward_size_ = 0;
     state_ = State::connect;
-    handler_.connector_.connect_tcp_v6(
-        address_v6(address_bytes),
-        port,
-        net::buffer(buffer.data(), buffer.size()),
+    handler_.connector_.connect(
+        {address_v6(address_bytes), port},
+        {buffer.data(), buffer.size()},
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {
@@ -226,10 +224,8 @@ void Handler::TcpConnection::connect_host(ConstBufferSpan buffer) {
     buffer.remove_prefix(1 + host_length + 2);
     forward_size_ = 0;
     state_ = State::connect;
-    handler_.connector_.connect_tcp_host(
-        host,
-        port,
-        net::buffer(buffer.data(), buffer.size()),
+    handler_.connector_.connect(
+        host, port, {buffer.data(), buffer.size()},
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {

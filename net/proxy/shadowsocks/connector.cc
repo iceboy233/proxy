@@ -5,28 +5,21 @@
 #include <utility>
 
 #include "base/logging.h"
+#include "net/interface/stream.h"
 #include "net/proxy/shadowsocks/decryptor.h"
 #include "net/proxy/shadowsocks/encryptor.h"
-#include "net/proxy/stream.h"
 #include "net/proxy/util/write.h"
 
 namespace net {
 namespace proxy {
 namespace shadowsocks {
 
-class Connector::TcpStream : public proxy::Stream {
+class Connector::TcpStream : public net::Stream {
 public:
     explicit TcpStream(Connector &connector);
 
     void start(
-        const net::address_v4 &address,
-        uint16_t port,
-        const_buffer initial_data,
-        absl::AnyInvocable<void(std::error_code) &&> callback);
-
-    void start(
-        const net::address_v6 &address,
-        uint16_t port,
+        const tcp::endpoint &endpoint,
         const_buffer initial_data,
         absl::AnyInvocable<void(std::error_code) &&> callback);
 
@@ -84,16 +77,14 @@ bool Connector::init(const InitOptions &options) {
     return true;
 }
 
-void Connector::connect_tcp_v4(
-    const address_v4 &address,
-    uint16_t port,
+void Connector::connect(
+    const tcp::endpoint &endpoint,
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
     auto stream = std::make_unique<TcpStream>(*this);
     stream->start(
-        address,
-        port,
+        endpoint,
         initial_data,
         [stream = std::move(stream), callback = std::move(callback)](
             std::error_code ec) mutable {
@@ -105,28 +96,7 @@ void Connector::connect_tcp_v4(
         });
 }
 
-void Connector::connect_tcp_v6(
-    const address_v6 &address,
-    uint16_t port,
-    const_buffer initial_data,
-    absl::AnyInvocable<void(
-        std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    auto stream = std::make_unique<TcpStream>(*this);
-    stream->start(
-        address,
-        port,
-        initial_data,
-        [stream = std::move(stream), callback = std::move(callback)](
-            std::error_code ec) mutable {
-            if (ec) {
-                std::move(callback)(ec, nullptr);
-                return;
-            }
-            std::move(callback)({}, std::move(stream));
-        });
-}
-
-void Connector::connect_tcp_host(
+void Connector::connect(
     std::string_view host,
     uint16_t port,
     const_buffer initial_data,
@@ -147,12 +117,9 @@ void Connector::connect_tcp_host(
         });
 }
 
-std::error_code Connector::bind_udp_v4(std::unique_ptr<Datagram> &datagram) {
-    // TODO
-    return make_error_code(std::errc::operation_not_supported);
-}
-
-std::error_code Connector::bind_udp_v6(std::unique_ptr<Datagram> &datagram) {
+std::error_code Connector::bind(
+    const udp::endpoint &endpoint,
+    std::unique_ptr<Datagram> &datagram) {
     // TODO
     return make_error_code(std::errc::operation_not_supported);
 }
@@ -161,8 +128,7 @@ Connector::TcpStream::TcpStream(Connector &connector)
     : connector_(connector) {}
 
 void Connector::TcpStream::start(
-    const net::address_v4 &address,
-    uint16_t port,
+    const tcp::endpoint &endpoint,
     const_buffer initial_data,
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
@@ -170,6 +136,8 @@ void Connector::TcpStream::start(
         encryptor_.salt(), connector_.pre_shared_key_.method().salt_size()});
     // TODO: split chunks if too large
     encryptor_.start_chunk();
+    address address = endpoint.address();
+    size_t address_size = address.is_v4() ? 4 : 16;
     size_t padding_size = absl::Uniform<size_t>(
         connector_.bit_gen_,
         connector_.min_padding_length_,
@@ -179,52 +147,21 @@ void Connector::TcpStream::start(
         encryptor_.push_big_u64(
             std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::system_clock::now().time_since_epoch()).count());
-        encryptor_.push_big_u16(padding_size + initial_data.size() + 9);
+        encryptor_.push_big_u16(
+            address_size + padding_size + initial_data.size() + 5);
     } else {
-        encryptor_.push_big_u16(initial_data.size() + 7);
+        encryptor_.push_big_u16(address_size + initial_data.size() + 3);
     }
     encryptor_.finish_chunk();
     encryptor_.start_chunk();
-    encryptor_.push_u8(1);  // ipv4
-    encryptor_.push_buffer(address.to_bytes());
-    encryptor_.push_big_u16(port);
-    if (connector_.pre_shared_key_.method().is_spec_2022()) {
-        encryptor_.push_big_u16(padding_size);
-        encryptor_.push_random(padding_size);
-    }
-    encryptor_.push_buffer({initial_data.data(), initial_data.size()});
-    encryptor_.finish_chunk();
-    connect(std::move(callback));
-}
-
-void Connector::TcpStream::start(
-    const net::address_v6 &address,
-    uint16_t port,
-    const_buffer initial_data,
-    absl::AnyInvocable<void(std::error_code) &&> callback) {
-    encryptor_.init(connector_.pre_shared_key_);
-    connector_.salt_filter_.insert({
-        encryptor_.salt(), connector_.pre_shared_key_.method().salt_size()});
-    // TODO: split chunks if too large
-    encryptor_.start_chunk();
-    size_t padding_size = absl::Uniform<size_t>(
-        connector_.bit_gen_,
-        connector_.min_padding_length_,
-        connector_.max_padding_length_);
-    if (connector_.pre_shared_key_.method().is_spec_2022()) {
-        encryptor_.push_u8(0);  // request
-        encryptor_.push_big_u64(
-            std::chrono::duration_cast<std::chrono::seconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count());
-        encryptor_.push_big_u16(padding_size + initial_data.size() + 21);
+    if (address.is_v4()) {
+        encryptor_.push_u8(1);  // ipv4
+        encryptor_.push_buffer(address.to_v4().to_bytes());
     } else {
-        encryptor_.push_big_u16(initial_data.size() + 19);
+        encryptor_.push_u8(4);  // ipv6
+        encryptor_.push_buffer(address.to_v6().to_bytes());
     }
-    encryptor_.finish_chunk();
-    encryptor_.start_chunk();
-    encryptor_.push_u8(4);  // ipv6
-    encryptor_.push_buffer(address.to_bytes());
-    encryptor_.push_big_u16(port);
+    encryptor_.push_big_u16(endpoint.port());
     if (connector_.pre_shared_key_.method().is_spec_2022()) {
         encryptor_.push_big_u16(padding_size);
         encryptor_.push_random(padding_size);
@@ -275,33 +212,23 @@ void Connector::TcpStream::start(
 
 void Connector::TcpStream::connect(
     absl::AnyInvocable<void(std::error_code) &&> callback) {
-    ConstBufferSpan write_buffer = encryptor_.buffer();
-    auto wrapped_callback = [this, callback = std::move(callback)](
-        std::error_code ec, std::unique_ptr<Stream> stream) mutable {
-        if (ec) {
-            std::move(callback)(ec);
-            return;
-        }
-        base_stream_ = std::move(stream);
-        std::move(callback)({});
-    };
     const Endpoint &endpoint = *connector_.endpoints_iter_++;
     if (connector_.endpoints_iter_ == connector_.endpoints_.end()) {
         connector_.endpoints_iter_ = connector_.endpoints_.begin();
     }
-    if (endpoint.address().is_v4()) {
-        connector_.base_connector_.connect_tcp_v4(
-            endpoint.address().to_v4(),
-            endpoint.port(),
-            buffer(write_buffer.data(), write_buffer.size()),
-            std::move(wrapped_callback));
-    } else {
-        connector_.base_connector_.connect_tcp_v6(
-            endpoint.address().to_v6(),
-            endpoint.port(),
-            buffer(write_buffer.data(), write_buffer.size()),
-            std::move(wrapped_callback));
-    }
+    ConstBufferSpan write_buffer = encryptor_.buffer();
+    connector_.base_connector_.connect(
+        endpoint,
+        {write_buffer.data(), write_buffer.size()},
+        [this, callback = std::move(callback)](
+            std::error_code ec, std::unique_ptr<Stream> stream) mutable {
+            if (ec) {
+                std::move(callback)(ec);
+                return;
+            }
+            base_stream_ = std::move(stream);
+            std::move(callback)({});
+        });
 }
 
 void Connector::TcpStream::read(

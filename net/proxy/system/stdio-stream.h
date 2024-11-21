@@ -5,7 +5,7 @@
 #include "io/native-file.h"
 #endif
 #include "net/asio.h"
-#include "net/proxy/stream.h"
+#include "net/interface/stream.h"
 
 namespace net {
 namespace proxy {

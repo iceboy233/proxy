@@ -8,7 +8,7 @@
 
 #include "absl/random/random.h"
 #include "net/endpoint.h"
-#include "net/proxy/connector.h"
+#include "net/interface/connector.h"
 #include "net/proxy/shadowsocks/method.h"
 #include "net/proxy/shadowsocks/pre-shared-key.h"
 #include "net/proxy/shadowsocks/salt-filter.h"
@@ -17,9 +17,9 @@ namespace net {
 namespace proxy {
 namespace shadowsocks {
 
-class Connector : public proxy::Connector {
+class Connector : public net::Connector {
 public:
-    explicit Connector(proxy::Connector &base_connector)
+    explicit Connector(net::Connector &base_connector)
         : base_connector_(base_connector) {}
 
     Connector(const Connector &) = delete;
@@ -35,34 +35,27 @@ public:
 
     bool init(const InitOptions &options);
 
-    void connect_tcp_v4(
-        const address_v4 &address,
-        uint16_t port,
+    void connect(
+        const tcp::endpoint &endpoint,
         const_buffer initial_data,
         absl::AnyInvocable<void(
             std::error_code, std::unique_ptr<Stream>) &&> callback) override;
 
-    void connect_tcp_v6(
-        const address_v6 &address,
-        uint16_t port,
-        const_buffer initial_data,
-        absl::AnyInvocable<void(
-            std::error_code, std::unique_ptr<Stream>) &&> callback) override;
-
-    void connect_tcp_host(
+    void connect(
         std::string_view host,
         uint16_t port,
         const_buffer initial_data,
         absl::AnyInvocable<void(
             std::error_code, std::unique_ptr<Stream>) &&> callback) override;
 
-    std::error_code bind_udp_v4(std::unique_ptr<Datagram> &datagram) override;
-    std::error_code bind_udp_v6(std::unique_ptr<Datagram> &datagram) override;
+    std::error_code bind(
+        const udp::endpoint &endpoint,
+        std::unique_ptr<Datagram> &datagram) override;
 
 private:
     class TcpStream;
 
-    proxy::Connector &base_connector_;
+    net::Connector &base_connector_;
     std::vector<Endpoint> endpoints_;
     std::vector<Endpoint>::iterator endpoints_iter_;
     PreSharedKey pre_shared_key_;

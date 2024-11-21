@@ -22,11 +22,11 @@ cc_library(
         ":encryptor",
         ":pre-shared-key",
         ":salt-filter",
-        "//net/proxy:interface",
         "//net/proxy/util:write",
         "@com_google_absl//absl/random",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:endpoint",
+        "@org_iceboy_trunk//net/interface",
     ],
 )
 
@@ -65,10 +65,10 @@ cc_library(
         ":pre-shared-key",
         ":salt-filter",
         ":session-subkey",
-        "//net/proxy:interface",
         "//net/proxy/util:write",
         "@com_google_absl//absl/container:fixed_array",
         "@org_iceboy_trunk//base:logging",
+        "@org_iceboy_trunk//net/interface",
     ],
 )
 

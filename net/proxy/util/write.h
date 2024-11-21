@@ -5,7 +5,7 @@
 
 #include "absl/functional/any_invocable.h"
 #include "base/types.h"
-#include "net/proxy/stream.h"
+#include "net/interface/stream.h"
 
 namespace net {
 namespace proxy {

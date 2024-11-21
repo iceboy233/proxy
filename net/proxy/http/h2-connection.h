@@ -13,7 +13,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/functional/any_invocable.h"
 #include "absl/types/span.h"
-#include "net/proxy/stream.h"
+#include "net/interface/stream.h"
 
 namespace net {
 namespace proxy {

@@ -2,16 +2,16 @@
 #define _NET_PROXY_SOCKS_HANDLER_H
 
 #include "net/asio.h"
-#include "net/proxy/connector.h"
-#include "net/proxy/handler.h"
+#include "net/interface/connector.h"
+#include "net/interface/handler.h"
 
 namespace net {
 namespace proxy {
 namespace socks {
 
-class Handler : public proxy::Handler {
+class Handler : public net::Handler {
 public:
-    Handler(const any_io_executor &executor, proxy::Connector &connector);
+    Handler(const any_io_executor &executor, net::Connector &connector);
 
     void handle_stream(std::unique_ptr<Stream> stream) override;
     void handle_datagram(std::unique_ptr<Datagram> datagram) override;
@@ -19,7 +19,7 @@ public:
 private:
     class TcpConnection;
 
-    proxy::Connector &connector_;
+    net::Connector &connector_;
 };
 
 }  // namespace socks

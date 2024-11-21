@@ -3,17 +3,18 @@
 
 #include <chrono>
 
+#include "absl/types/span.h"
+#include "net/timer-list.h"
+#include "net/interface/connector.h"
 #include "net/proxy/ares/resolver.h"
-#include "net/proxy/connector.h"
 #include "net/proxy/system/tcp-socket-stream.h"
 #include "net/proxy/system/udp-socket-datagram.h"
-#include "net/timer-list.h"
 
 namespace net {
 namespace proxy {
 namespace system {
 
-class Connector : public proxy::Connector {
+class Connector : public net::Connector {
 public:
     struct Options {
         std::chrono::nanoseconds timeout = std::chrono::minutes(5);
@@ -26,36 +27,28 @@ public:
     Connector(const Connector &) = delete;
     Connector &operator=(const Connector &) = delete;
 
-    void connect_tcp_v4(
-        const address_v4 &address,
-        uint16_t port,
+    void connect(
+        const tcp::endpoint &endpoint,
         const_buffer initial_data,
         absl::AnyInvocable<void(
             std::error_code, std::unique_ptr<Stream>) &&> callback) override;
 
-    void connect_tcp_v6(
-        const address_v6 &address,
-        uint16_t port,
-        const_buffer initial_data,
-        absl::AnyInvocable<void(
-            std::error_code, std::unique_ptr<Stream>) &&> callback) override;
-
-    void connect_tcp_host(
+    void connect(
         std::string_view host,
         uint16_t port,
         const_buffer initial_data,
         absl::AnyInvocable<void(
             std::error_code, std::unique_ptr<Stream>) &&> callback) override;
 
-    std::error_code bind_udp_v4(std::unique_ptr<Datagram> &datagram) override;
-    std::error_code bind_udp_v6(std::unique_ptr<Datagram> &datagram) override;
+    std::error_code bind(
+        const udp::endpoint &endpoint,
+        std::unique_ptr<Datagram> &datagram) override;
 
     ares::Resolver &resolver() { return resolver_; }
 
 private:
-    template <typename EndpointsT>
-    void connect_tcp(
-        const EndpointsT &endpoints,
+    void connect_internal(
+        absl::Span<tcp::endpoint const> endpoints,
         const_buffer initial_data,
         absl::AnyInvocable<void(
             std::error_code, std::unique_ptr<Stream>) &&> callback);

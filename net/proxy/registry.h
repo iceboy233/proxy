@@ -8,8 +8,8 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/functional/any_invocable.h"
 #include "net/asio.h"
-#include "net/proxy/connector.h"
-#include "net/proxy/handler.h"
+#include "net/interface/connector.h"
+#include "net/interface/handler.h"
 
 namespace net {
 namespace proxy {

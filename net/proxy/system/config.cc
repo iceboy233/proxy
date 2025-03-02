@@ -30,6 +30,7 @@ struct ConfigVisitor<ResolverConfig> {
 struct SystemConnectorConfig {
     double timeout = 300;
     bool tcp_no_delay = true;
+    bool tcp_fast_open_connect = true;
     ResolverConfig resolver;
 };
 
@@ -39,6 +40,7 @@ struct ConfigVisitor<SystemConnectorConfig> {
     void operator()(V &&v, SystemConnectorConfig &c) const {
         v("timeout", c.timeout);
         v("tcp-no-delay", c.tcp_no_delay);
+        v("tcp-fast-open-connect", c.tcp_fast_open_connect);
         v("resolver", c.resolver);
     }
 };
@@ -52,6 +54,7 @@ REGISTER_CONNECTOR(system, [](Proxy &proxy, const auto &ptree) {
     options.timeout = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::duration<double>(config.timeout));
     options.tcp_no_delay = config.tcp_no_delay;
+    options.tcp_fast_open_connect = config.tcp_fast_open_connect;
     for (const std::string &server : config.resolver.server) {
         auto server_endpoint = Endpoint::from_string(server);
         if (!server_endpoint) {

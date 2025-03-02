@@ -22,7 +22,7 @@ cc_library(
         "//net/proxy/ares:resolver",
         "//net/proxy/util:write",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+        "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:asio",
         "@org_iceboy_trunk//net:timer-list",
         "@org_iceboy_trunk//net/interface",

@@ -25,6 +25,17 @@ Listener::Listener(
       accept_error_timer_(executor_) {
     // TODO: Support more flexible config, such as enabling TCP or UDP
     // individually, using different handlers, and live config reloading.
+#ifdef TCP_FASTOPEN
+    if (options.tcp_fast_open > 0) {
+        boost::system::error_code ec;
+        tcp_acceptor_.set_option(
+            boost::asio::detail::socket_option::integer<
+                IPPROTO_TCP, TCP_FASTOPEN>(options.tcp_fast_open), ec);
+        if (ec) {
+            LOG(error) << "set_option failed for fast_open: " << ec;
+        }
+    }
+#endif
     accept();
     bind();
 }

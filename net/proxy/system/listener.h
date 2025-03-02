@@ -17,6 +17,7 @@ public:
     struct Options {
         std::chrono::nanoseconds timeout = std::chrono::minutes(5);
         bool tcp_no_delay = true;
+        int tcp_fast_open = 5;
         std::chrono::nanoseconds accept_error_delay =
             std::chrono::milliseconds(500);
     };

@@ -4,24 +4,53 @@
 #include <utility>
 
 #include "absl/strings/str_cat.h"
+#include "base/logging.h"
 #include "net/proxy/util/write.h"
 
 namespace net {
 namespace proxy {
 namespace system {
 
+class Connector::ConnectOperation {
+public:
+    ConnectOperation(
+        Connector &connector,
+        const_buffer initial_data,
+        absl::AnyInvocable<void(
+            std::error_code, std::unique_ptr<Stream>) &&> callback);
+
+    void connect(const address &address, uint16_t port);
+    void resolve(std::string_view host, uint16_t port);
+
+private:
+    void connect_next();
+    void send_initial_data(std::unique_ptr<Stream> stream);
+    void finish(std::error_code ec, std::unique_ptr<Stream> stream);
+
+    Connector &connector_;
+    const_buffer initial_data_;
+    absl::AnyInvocable<void(
+        std::error_code, std::unique_ptr<Stream>) &&> callback_;
+    std::vector<address> addresses_;
+    uint16_t port_;
+    std::vector<address>::iterator addresses_iter_;
+};
+
 Connector::Connector(const any_io_executor &executor, const Options &options)
     : executor_(executor),
       resolver_(executor_, *this, options.resolver_options),
       timer_list_(executor_, options.timeout),
-      tcp_no_delay_(options.tcp_no_delay) {}
+      tcp_no_delay_(options.tcp_no_delay),
+      tcp_fast_open_connect_(options.tcp_fast_open_connect) {}
 
 void Connector::connect(
     const tcp::endpoint &endpoint,
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    connect_internal({endpoint}, initial_data, std::move(callback));
+    auto *operation = new ConnectOperation(
+        *this, initial_data, std::move(callback));
+    operation->connect(endpoint.address(), endpoint.port());
 }
 
 void Connector::connect(
@@ -30,21 +59,9 @@ void Connector::connect(
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    resolver_.resolve(
-        host,
-        [this, port, initial_data, callback = std::move(callback)](
-            std::error_code ec, const std::vector<address> &addresses) mutable {
-        if (ec) {
-            std::move(callback)(ec, nullptr);
-            return;
-        }
-        std::vector<tcp::endpoint> endpoints;
-        endpoints.reserve(addresses.size());
-        for (const auto &address : addresses) {
-            endpoints.push_back(tcp::endpoint(address, port));
-        }
-        connect_internal(endpoints, initial_data, std::move(callback));
-    });
+    auto *operation = new ConnectOperation(
+        *this, initial_data, std::move(callback));
+    operation->resolve(host, port);
 }
 
 std::error_code Connector::bind(
@@ -63,53 +80,112 @@ std::error_code Connector::bind(
     return {};
 }
 
-void Connector::connect_internal(
-    absl::Span<tcp::endpoint const> endpoints,
+Connector::ConnectOperation::ConnectOperation(
+    Connector &connector,
     const_buffer initial_data,
     absl::AnyInvocable<void(
-        std::error_code, std::unique_ptr<Stream>) &&> callback) {
+        std::error_code, std::unique_ptr<Stream>) &&> callback)
+    : connector_(connector),
+      initial_data_(initial_data),
+      callback_(std::move(callback)) {}
+
+void Connector::ConnectOperation::connect(
+    const address &address, uint16_t port) {
+    addresses_ = {address};
+    port_ = port;
+    addresses_iter_ = addresses_.begin();
+    connect_next();
+}
+
+void Connector::ConnectOperation::resolve(
+    std::string_view host, uint16_t port) {
+    port_ = port;
+    connector_.resolver_.resolve(
+        host,
+        [this](
+            std::error_code ec, const std::vector<address> &addresses) mutable {
+        if (ec) {
+            finish(ec, nullptr);
+            return;
+        }
+        if (addresses.empty()) {
+            finish(make_error_code(std::errc::host_unreachable), nullptr);
+            return;
+        }
+        addresses_ = addresses;
+        addresses_iter_ = addresses_.begin();
+        connect_next();
+    });
+}
+
+void Connector::ConnectOperation::connect_next() {
     auto stream = std::make_unique<TcpSocketStream>(
-        tcp::socket(executor_), timer_list_);
+        tcp::socket(connector_.executor_), connector_.timer_list_);
     tcp::socket &socket = stream->socket();
-    async_connect(
-        socket,
-        endpoints,
-        [this, stream = std::move(stream), initial_data,
-            callback = std::move(callback)](
-            std::error_code ec, const tcp::endpoint &) mutable {
+    boost::system::error_code ec;
+    socket.open(addresses_iter_->is_v4() ? tcp::v4() : tcp::v6(), ec);
+    if (ec) {
+        if (++addresses_iter_ == addresses_.end()) {
+            finish(ec, nullptr);
+        } else {
+            connect_next();
+        }
+        return;
+    }
+    if (connector_.tcp_no_delay_) {
+        socket.set_option(tcp::no_delay(true), ec);
+        if (ec) {
+            LOG(error) << "set_option failed for no_delay: " << ec;
+        }
+    }
+#ifdef TCP_FASTOPEN_CONNECT
+    if (connector_.tcp_fast_open_connect_) {
+        socket.set_option(
+            boost::asio::detail::socket_option::boolean<
+                IPPROTO_TCP, TCP_FASTOPEN_CONNECT>(true), ec);
+        if (ec) {
+            LOG(error) << "set_option failed for fast_open_connect: " << ec;
+        }
+    }
+#endif
+    socket.async_connect(
+        tcp::endpoint(*addresses_iter_, port_),
+        [this, stream = std::move(stream)](std::error_code ec) mutable {
             if (ec) {
-                std::move(callback)(ec, nullptr);
+                if (++addresses_iter_ == addresses_.end()) {
+                    finish(ec, nullptr);
+                } else {
+                    connect_next();
+                }
                 return;
             }
-            if (tcp_no_delay_) {
-                stream->socket().set_option(tcp::no_delay(true));
-            }
-            if (initial_data.size()) {
-                send_initial_data(
-                    std::move(stream), initial_data, std::move(callback));
+            if (initial_data_.size()) {
+                send_initial_data(std::move(stream));
                 return;
             }
-            std::move(callback)({}, std::move(stream));
+            finish({}, std::move(stream));
         });
 }
 
-void Connector::send_initial_data(
-    std::unique_ptr<TcpSocketStream> stream,
-    const_buffer initial_data,
-    absl::AnyInvocable<void(
-        std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    TcpSocketStream &stream_ref = *stream;
+void Connector::ConnectOperation::send_initial_data(
+    std::unique_ptr<Stream> stream) {
+    Stream &stream_ref = *stream;
     write(
         stream_ref,
-        {initial_data.data(), initial_data.size()},
-        [stream = std::move(stream), callback = std::move(callback)](
-            std::error_code ec) mutable {
+        {initial_data_.data(), initial_data_.size()},
+        [this, stream = std::move(stream)](std::error_code ec) mutable {
         if (ec) {
-            std::move(callback)(ec, nullptr);
+            finish(ec, nullptr);
             return;
         }
-        std::move(callback)({}, std::move(stream));
+        finish({}, std::move(stream));
     });
+}
+
+void Connector::ConnectOperation::finish(
+    std::error_code ec, std::unique_ptr<Stream> stream) {
+    std::move(callback_)(ec, std::move(stream));
+    delete this;
 }
 
 }  // namespace system

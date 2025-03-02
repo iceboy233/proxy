@@ -56,6 +56,7 @@ void Proxy::create_handlers() {
         options.timeout = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::duration<double>(config.get<double>("timeout", 300)));
         options.tcp_no_delay = config.get<bool>("tcp_no_delay", true);
+        options.tcp_fast_open = config.get<int>("tcp_fast_open", 5);
         listeners_.push_back(std::make_unique<system::Listener>(
             executor_, *listen_endpoint, handler_ref, options));
     }

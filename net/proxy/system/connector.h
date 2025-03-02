@@ -3,7 +3,6 @@
 
 #include <chrono>
 
-#include "absl/types/span.h"
 #include "net/timer-list.h"
 #include "net/interface/connector.h"
 #include "net/proxy/ares/resolver.h"
@@ -19,6 +18,7 @@ public:
     struct Options {
         std::chrono::nanoseconds timeout = std::chrono::minutes(5);
         bool tcp_no_delay = true;
+        bool tcp_fast_open_connect = true;
         ares::Resolver::Options resolver_options;
     };
 
@@ -47,22 +47,13 @@ public:
     ares::Resolver &resolver() { return resolver_; }
 
 private:
-    void connect_internal(
-        absl::Span<tcp::endpoint const> endpoints,
-        const_buffer initial_data,
-        absl::AnyInvocable<void(
-            std::error_code, std::unique_ptr<Stream>) &&> callback);
-
-    static void send_initial_data(
-        std::unique_ptr<TcpSocketStream> stream,
-        const_buffer initial_data,
-        absl::AnyInvocable<void(
-            std::error_code, std::unique_ptr<Stream>) &&> callback);
+    class ConnectOperation;
 
     any_io_executor executor_;
     ares::Resolver resolver_;
     TimerList timer_list_;
     bool tcp_no_delay_;
+    bool tcp_fast_open_connect_;
 };
 
 }  // namespace proxy

@@ -30,7 +30,7 @@ struct ConfigVisitor<ResolverConfig> {
 struct SystemConnectorConfig {
     double timeout = 300;
     bool tcp_no_delay = true;
-    bool tcp_fast_open_connect = true;
+    int tcp_fast_open_connect = 1;
     ResolverConfig resolver;
 };
 

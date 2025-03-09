@@ -139,7 +139,13 @@ void Connector::ConnectOperation::connect_next() {
         }
     }
 #ifdef TCP_FASTOPEN_CONNECT
-    if (connector_.tcp_fast_open_connect_) {
+    switch (connector_.tcp_fast_open_connect_) {
+    case 1:
+        if (!initial_data_.size()) {
+            break;
+        }
+        [[fallthrough]];
+    case 2:
         socket.set_option(
             boost::asio::detail::socket_option::boolean<
                 IPPROTO_TCP, TCP_FASTOPEN_CONNECT>(true), ec);

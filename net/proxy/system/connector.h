@@ -18,7 +18,7 @@ public:
     struct Options {
         std::chrono::nanoseconds timeout = std::chrono::minutes(5);
         bool tcp_no_delay = true;
-        bool tcp_fast_open_connect = true;
+        int tcp_fast_open_connect = 1;
         ares::Resolver::Options resolver_options;
     };
 
@@ -53,7 +53,7 @@ private:
     ares::Resolver resolver_;
     TimerList timer_list_;
     bool tcp_no_delay_;
-    bool tcp_fast_open_connect_;
+    int tcp_fast_open_connect_;
 };
 
 }  // namespace proxy

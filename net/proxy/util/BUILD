@@ -7,7 +7,7 @@ cc_library(
     deps = [
         "@abseil-cpp//absl/container:flat_hash_set",
         "@boost.property_tree",
-        "@org_iceboy_trunk//base:logging",
+        "@trunk//base:logging",
     ],
 )
 
@@ -19,7 +19,7 @@ cc_library(
         ":write",
         "@abseil-cpp//absl/container:fixed_array",
         "@abseil-cpp//absl/functional:any_invocable",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net/interface",
     ],
 )
 
@@ -27,8 +27,8 @@ cc_library(
     name = "stream-wrapper",
     hdrs = ["stream-wrapper.h"],
     deps = [
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net:asio",
+        "@trunk//net/interface",
     ],
 )
 
@@ -38,7 +38,7 @@ cc_library(
     hdrs = ["write.h"],
     deps = [
         "@abseil-cpp//absl/functional:any_invocable",
-        "@org_iceboy_trunk//base:types",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//base:types",
+        "@trunk//net/interface",
     ],
 )

@@ -7,7 +7,7 @@ cc_library(
         ":connector",
         "//net/proxy",
         "//net/proxy/util:config",
-        "@org_iceboy_trunk//base:logging",
+        "@trunk//base:logging",
     ],
     alwayslink = 1,
 )
@@ -22,10 +22,10 @@ cc_library(
         "//net/proxy/ares:resolver",
         "//net/proxy/util:write",
         "@abseil-cpp//absl/strings",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net:timer-list",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//base:logging",
+        "@trunk//net:asio",
+        "@trunk//net:timer-list",
+        "@trunk//net/interface",
     ],
 )
 
@@ -36,11 +36,11 @@ cc_library(
     deps = [
         ":tcp-socket-stream",
         ":udp-socket-datagram",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net:endpoint",
-        "@org_iceboy_trunk//net:timer-list",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//base:logging",
+        "@trunk//net:asio",
+        "@trunk//net:endpoint",
+        "@trunk//net:timer-list",
+        "@trunk//net/interface",
     ],
 )
 
@@ -50,12 +50,12 @@ cc_library(
     hdrs = ["stdio-stream.h"],
     deps = [
         "@abseil-cpp//absl/container:fixed_array",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net:asio",
+        "@trunk//net/interface",
     ] + select({
         "@platforms//os:windows": [
-            "@org_iceboy_trunk//io:file-utils",
-            "@org_iceboy_trunk//io:native-file",
+            "@trunk//io:file-utils",
+            "@trunk//io:native-file",
         ],
         "//conditions:default": [],
     }),
@@ -67,9 +67,9 @@ cc_library(
     hdrs = ["tcp-socket-stream.h"],
     deps = [
         "@abseil-cpp//absl/container:fixed_array",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net:timer-list",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net:asio",
+        "@trunk//net:timer-list",
+        "@trunk//net/interface",
     ],
 )
 
@@ -79,7 +79,7 @@ cc_library(
     hdrs = ["udp-socket-datagram.h"],
     deps = [
         "@abseil-cpp//absl/container:fixed_array",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net:asio",
+        "@trunk//net/interface",
     ],
 )

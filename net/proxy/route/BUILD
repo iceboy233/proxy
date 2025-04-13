@@ -7,7 +7,7 @@ cc_library(
         ":connector",
         "//net/proxy",
         "//net/proxy/util:config",
-        "@org_iceboy_trunk//base:logging",
+        "@trunk//base:logging",
     ],
     alwayslink = 1,
 )
@@ -18,7 +18,7 @@ cc_library(
     hdrs = ["connector.h"],
     deps = [
         ":host-matcher",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net/interface",
     ],
 )
 

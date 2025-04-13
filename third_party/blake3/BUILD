@@ -27,18 +27,24 @@ cc_library(
 
 config_setting(
     name = "linux_x86_64",
-    values = {"cpu": "k8"},
-    constraint_values = ["@platforms//os:linux"],
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
 )
 
 config_setting(
     name = "linux_aarch64",
-    values = {"cpu": "aarch64"},
-    constraint_values = ["@platforms//os:linux"],
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
 )
 
 config_setting(
     name = "windows_x86_64",
-    values = {"cpu": "x64_windows_msvc"},
-    constraint_values = ["@platforms//os:windows"],
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
 )

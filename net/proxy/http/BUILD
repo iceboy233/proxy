@@ -9,9 +9,9 @@ cc_library(
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/types:span",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//net/interface",
-        "@org_iceboy_trunk//util:strings",
+        "@trunk//base:logging",
+        "@trunk//net/interface",
+        "@trunk//util:strings",
     ],
 )
 
@@ -23,6 +23,6 @@ cc_library(
         "//net/proxy/util:stream-wrapper",
         "@abseil-cpp//absl/container:fixed_array",
         "@boringssl//:ssl",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net/interface",
     ],
 )

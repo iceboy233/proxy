@@ -8,7 +8,7 @@ cc_library(
         ":handler",
         "//net/proxy",
         "//net/proxy/util:config",
-        "@org_iceboy_trunk//base:logging",
+        "@trunk//base:logging",
     ],
     alwayslink = 1,
 )
@@ -24,9 +24,9 @@ cc_library(
         ":salt-filter",
         "//net/proxy/util:write",
         "@abseil-cpp//absl/random",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//net:endpoint",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//base:logging",
+        "@trunk//net:endpoint",
+        "@trunk//net/interface",
     ],
 )
 
@@ -38,7 +38,7 @@ cc_library(
         ":pre-shared-key",
         ":session-subkey",
         "@abseil-cpp//absl/container:fixed_array",
-        "@org_iceboy_trunk//base:types",
+        "@trunk//base:types",
     ],
 )
 
@@ -51,7 +51,7 @@ cc_library(
         ":session-subkey",
         "@boost.endian",
         "@boringssl//:crypto",
-        "@org_iceboy_trunk//base:types",
+        "@trunk//base:types",
     ],
 )
 
@@ -67,8 +67,8 @@ cc_library(
         ":session-subkey",
         "//net/proxy/util:write",
         "@abseil-cpp//absl/container:fixed_array",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//base:logging",
+        "@trunk//net/interface",
     ],
 )
 
@@ -96,7 +96,7 @@ cc_library(
         ":method",
         "@abseil-cpp//absl/strings",
         "@boringssl//:crypto",
-        "@org_iceboy_trunk//base:logging",
+        "@trunk//base:logging",
     ],
 )
 
@@ -106,8 +106,8 @@ cc_library(
     hdrs = ["salt-filter.h"],
     deps = [
         "@boringssl//:crypto",
-        "@org_iceboy_trunk//base:types",
-        "@org_iceboy_trunk//util:hash-filter",
+        "@trunk//base:types",
+        "@trunk//util:hash-filter",
     ],
 )
 
@@ -128,7 +128,7 @@ cc_library(
         ":pre-shared-key",
         "//third_party/blake3",
         "@boost.endian",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//base:types",
+        "@trunk//base:logging",
+        "@trunk//base:types",
     ],
 )

@@ -4,11 +4,11 @@ cc_binary(
     deps = [
         "//net/proxy/ares:resolver",
         "//net/proxy/system:connector",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//io:native-file",
-        "@org_iceboy_trunk//io:stream",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net:blocking-result",
+        "@trunk//base:logging",
+        "@trunk//io:native-file",
+        "@trunk//io:stream",
+        "@trunk//net:asio",
+        "@trunk//net:blocking-result",
     ],
 )
 
@@ -25,9 +25,9 @@ cc_binary(
         "//net/proxy/system:stdio-stream",
         "//net/proxy/util:copy",
         "@boost.property_tree",
-        "@org_iceboy_trunk//base:flags",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//util:strings",
+        "@trunk//base:flags",
+        "@trunk//base:logging",
+        "@trunk//net:asio",
+        "@trunk//util:strings",
     ],
 )

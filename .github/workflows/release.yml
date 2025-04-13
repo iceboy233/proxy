@@ -36,7 +36,7 @@ jobs:
           sudo chmod +x /usr/local/bin/bazel
       - name: Build
         run: |
-          bazel build -c opt --cpu=aarch64 --crosstool_top=@org_iceboy_trunk//third_party/linux_crosstool net/tools:miracle-proxy
+          bazel build -c opt --platforms=@trunk//tools/platforms:linux-aarch64 net/tools:miracle-proxy
           ln bazel-bin/net/tools/miracle-proxy miracle-proxy-${GITHUB_REF_NAME}-linux-arm64
       - name: Release
         uses: softprops/action-gh-release@v1

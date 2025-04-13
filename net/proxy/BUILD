@@ -9,9 +9,9 @@ cc_library(
         "//net/proxy/system:listener",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@boost.property_tree",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//base:logging",
+        "@trunk//net:asio",
+        "@trunk//net/interface",
     ],
 )
 
@@ -23,8 +23,8 @@ cc_library(
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/functional:any_invocable",
         "@boost.property_tree",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//base:logging",
+        "@trunk//net:asio",
+        "@trunk//net/interface",
     ],
 )

@@ -7,7 +7,7 @@ cc_library(
         ":handler",
         "//net/proxy",
         "//net/proxy/util:config",
-        "@org_iceboy_trunk//base:logging",
+        "@trunk//base:logging",
     ],
     alwayslink = 1,
 )
@@ -21,9 +21,9 @@ cc_library(
         "@abseil-cpp//absl/algorithm",
         "@abseil-cpp//absl/container:fixed_array",
         "@boost.endian",
-        "@org_iceboy_trunk//base:logging",
-        "@org_iceboy_trunk//base:types",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//base:logging",
+        "@trunk//base:types",
+        "@trunk//net:asio",
+        "@trunk//net/interface",
     ],
 )

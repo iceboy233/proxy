@@ -20,7 +20,7 @@ cc_library(
     deps = [
         "//net/proxy/util:write",
         "@abseil-cpp//absl/container:fixed_array",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net/interface",
     ],
 )
 
@@ -30,7 +30,7 @@ cc_library(
     hdrs = ["null-handler.h"],
     deps = [
         "@abseil-cpp//absl/container:fixed_array",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net/interface",
     ],
 )
 
@@ -41,7 +41,7 @@ cc_library(
     deps = [
         "@abseil-cpp//absl/container:fixed_array",
         "@boringssl//:crypto",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net/interface",
     ],
 )
 
@@ -51,6 +51,6 @@ cc_library(
     hdrs = ["zero-handler.h"],
     deps = [
         "@abseil-cpp//absl/container:fixed_array",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net/interface",
     ],
 )

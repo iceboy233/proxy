@@ -19,10 +19,10 @@ cc_library(
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/types:span",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net:endpoint",
-        "@org_iceboy_trunk//net:timer-list",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net:asio",
+        "@trunk//net:endpoint",
+        "@trunk//net:timer-list",
+        "@trunk//net/interface",
     ],
 )
 
@@ -34,7 +34,7 @@ cc_library(
         "//net/proxy/util:write",
         "//third_party/cares",
         "@boost.smart_ptr",
-        "@org_iceboy_trunk//net:asio",
-        "@org_iceboy_trunk//net/interface",
+        "@trunk//net:asio",
+        "@trunk//net/interface",
     ],
 )

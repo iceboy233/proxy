@@ -23,7 +23,7 @@ cc_library(
         ":pre-shared-key",
         ":salt-filter",
         "//net/proxy/util:write",
-        "@com_google_absl//absl/random",
+        "@abseil-cpp//absl/random",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:endpoint",
         "@org_iceboy_trunk//net/interface",
@@ -37,7 +37,7 @@ cc_library(
     deps = [
         ":pre-shared-key",
         ":session-subkey",
-        "@com_google_absl//absl/container:fixed_array",
+        "@abseil-cpp//absl/container:fixed_array",
         "@org_iceboy_trunk//base:types",
     ],
 )
@@ -49,8 +49,8 @@ cc_library(
     deps = [
         ":pre-shared-key",
         ":session-subkey",
+        "@boost.endian",
         "@boringssl//:crypto",
-        "@org_boost_boost//:endian",
         "@org_iceboy_trunk//base:types",
     ],
 )
@@ -66,7 +66,7 @@ cc_library(
         ":salt-filter",
         ":session-subkey",
         "//net/proxy/util:write",
-        "@com_google_absl//absl/container:fixed_array",
+        "@abseil-cpp//absl/container:fixed_array",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net/interface",
     ],
@@ -84,7 +84,7 @@ cc_test(
     srcs = ["method_test.cc"],
     deps = [
         ":method",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -94,8 +94,8 @@ cc_library(
     hdrs = ["pre-shared-key.h"],
     deps = [
         ":method",
+        "@abseil-cpp//absl/strings",
         "@boringssl//:crypto",
-        "@com_google_absl//absl/strings",
         "@org_iceboy_trunk//base:logging",
     ],
 )
@@ -116,8 +116,8 @@ cc_test(
     srcs = ["salt-filter_test.cc"],
     deps = [
         ":salt-filter",
-        "@com_google_googletest//:gtest_main",
-    ]
+        "@googletest//:gtest_main",
+    ],
 )
 
 cc_library(
@@ -127,7 +127,7 @@ cc_library(
     deps = [
         ":pre-shared-key",
         "//third_party/blake3",
-        "@org_boost_boost//:endian",
+        "@boost.endian",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//base:types",
     ],

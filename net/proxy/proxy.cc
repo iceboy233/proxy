@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <functional>
+#include <utility>
 
 #include "base/logging.h"
 #include "net/endpoint.h"
@@ -16,16 +17,19 @@ Proxy::Proxy(const any_io_executor &executor)
 void Proxy::load_config(
     const boost::property_tree::ptree &config,
     const LoadConfigOptions &options) {
-    handlers_config_ = config.get_child("handlers", {});
-    auto listeners_config = config.get_child("listeners", {});
-    if (!listeners_config.empty()) {
+    if (auto handlers_config = config.get_child_optional("handlers")) {
+        handlers_config_ = *std::move(handlers_config);
+    }
+    if (auto listeners_config = config.get_child_optional("listeners")) {
         LOG(warning) << "listeners is deprecated, rename to handlers instead";
         handlers_config_.insert(
             handlers_config_.end(),
-            listeners_config.begin(),
-            listeners_config.end());
+            listeners_config->begin(),
+            listeners_config->end());
     }
-    connectors_config_ = config.get_child("connectors", {});
+    if (auto connectors_config = config.get_child_optional("connectors")) {
+        connectors_config_ = *std::move(connectors_config);
+    }
     if (connectors_config_.find("") == connectors_config_.not_found()) {
         boost::property_tree::ptree default_connector;
         default_connector.put("type", "system");

@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install tools
         run: |
-          sudo curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/6.5.0/bazel-6.5.0-linux-x86_64"
+          sudo curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/8.1.1/bazel-8.1.1-linux-x86_64"
           sudo chmod +x /usr/local/bin/bazel
       - name: Build
         run: |
@@ -32,7 +32,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install crossbuild-essential-arm64 -y
-          sudo curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/6.5.0/bazel-6.5.0-linux-x86_64"
+          sudo curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/8.1.1/bazel-8.1.1-linux-x86_64"
           sudo chmod +x /usr/local/bin/bazel
       - name: Build
         run: |

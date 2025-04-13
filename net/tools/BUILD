@@ -24,7 +24,7 @@ cc_binary(
         "//net/proxy/system:config",
         "//net/proxy/system:stdio-stream",
         "//net/proxy/util:copy",
-        "@org_boost_boost//:property_tree",
+        "@boost.property_tree",
         "@org_iceboy_trunk//base:flags",
         "@org_iceboy_trunk//base:logging",
         "@org_iceboy_trunk//net:asio",

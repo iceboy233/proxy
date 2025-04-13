@@ -24,7 +24,7 @@ jobs:
           files: |
             miracle-proxy-v*.*.*-linux-x86_64
 
-  build-linux-arm64:
+  build-linux-aarch64:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
@@ -37,12 +37,12 @@ jobs:
       - name: Build
         run: |
           bazel build -c opt --platforms=@trunk//tools/platforms:linux-aarch64 net/tools:miracle-proxy
-          ln bazel-bin/net/tools/miracle-proxy miracle-proxy-${GITHUB_REF_NAME}-linux-arm64
+          ln bazel-bin/net/tools/miracle-proxy miracle-proxy-${GITHUB_REF_NAME}-linux-aarch64
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            miracle-proxy-v*.*.*-linux-arm64
+            miracle-proxy-v*.*.*-linux-aarch64
 
   build-windows-x86_64:
     runs-on: windows-2019

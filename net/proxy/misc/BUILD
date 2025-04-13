@@ -19,7 +19,7 @@ cc_library(
     hdrs = ["echo-handler.h"],
     deps = [
         "//net/proxy/util:write",
-        "@com_google_absl//absl/container:fixed_array",
+        "@abseil-cpp//absl/container:fixed_array",
         "@org_iceboy_trunk//net/interface",
     ],
 )
@@ -29,7 +29,7 @@ cc_library(
     srcs = ["null-handler.cc"],
     hdrs = ["null-handler.h"],
     deps = [
-        "@com_google_absl//absl/container:fixed_array",
+        "@abseil-cpp//absl/container:fixed_array",
         "@org_iceboy_trunk//net/interface",
     ],
 )
@@ -39,8 +39,8 @@ cc_library(
     srcs = ["random-handler.cc"],
     hdrs = ["random-handler.h"],
     deps = [
+        "@abseil-cpp//absl/container:fixed_array",
         "@boringssl//:crypto",
-        "@com_google_absl//absl/container:fixed_array",
         "@org_iceboy_trunk//net/interface",
     ],
 )
@@ -50,7 +50,7 @@ cc_library(
     srcs = ["zero-handler.cc"],
     hdrs = ["zero-handler.h"],
     deps = [
-        "@com_google_absl//absl/container:fixed_array",
+        "@abseil-cpp//absl/container:fixed_array",
         "@org_iceboy_trunk//net/interface",
     ],
 )

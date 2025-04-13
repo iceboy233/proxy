@@ -17,3 +17,7 @@ build:windows --host_copt=-DNOMINMAX
 build:windows --host_copt=-DWIN32_LEAN_AND_MEAN
 build:windows --host_copt=-utf-8
 build:windows --host_cxxopt=/std:c++17
+
+build:asan --copt=-fsanitize=address
+build:asan --linkopt=-fsanitize=address
+build:asan --linkopt=-static-libasan

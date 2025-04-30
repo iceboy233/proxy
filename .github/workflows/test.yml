@@ -7,18 +7,21 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
+    container: debian:bullseye
     steps:
       - uses: actions/checkout@v3
       - name: Mount bazel cache
         uses: actions/cache@v3
         with:
-          key: test-bazel-ubuntu-20.04
+          key: test-bazel-debian-bullseye
           path: ~/.cache/bazel
       - name: Install tools
         run: |
-          sudo curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/8.1.1/bazel-8.1.1-linux-x86_64"
-          sudo chmod +x /usr/local/bin/bazel
+          apt-get update
+          apt-get install build-essential curl git -y
+          curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/8.2.1/bazel-8.2.1-linux-x86_64"
+          chmod +x /usr/local/bin/bazel
       - name: Test
         run: |
           bazel test -c opt ...

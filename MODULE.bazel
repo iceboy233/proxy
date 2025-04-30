@@ -1,6 +1,7 @@
 module(name = "proxy")
 
 bazel_dep(name = "abseil-cpp", version = "20250127.1")
+bazel_dep(name = "blake3", version = "1.5.4.bcr.1")
 bazel_dep(name = "boost.asio", version = "1.87.0.bcr.1")
 bazel_dep(name = "boost.endian", version = "1.87.0")
 bazel_dep(name = "boost.log", version = "1.87.0")
@@ -15,11 +16,6 @@ bazel_dep(name = "trunk")
 
 git_override(
     module_name = "trunk",
-    commit = "575a28d82a8c0cf28f9d97220df8319261f47e55",
+    commit = "a9fe57d9083edb37b90b8b3471ce255a83d3cb5f",
     remote = "https://github.com/iceboy233/trunk.git",
-)
-
-register_toolchains(
-    "@trunk//third_party/linux_crosstool:linux-aarch64_toolchain",
-    "@trunk//third_party/linux_crosstool:linux-x86_64_toolchain",
 )

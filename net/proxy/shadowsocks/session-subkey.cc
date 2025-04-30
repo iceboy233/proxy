@@ -1,11 +1,11 @@
 #include "net/proxy/shadowsocks/session-subkey.h"
 
+#include <blake3.h>
 #include <openssl/evp.h>
 #include <openssl/hkdf.h>
 #include <string_view>
 
 #include "base/logging.h"
-#include "third_party/blake3/blake3.h"
 
 namespace net {
 namespace proxy {

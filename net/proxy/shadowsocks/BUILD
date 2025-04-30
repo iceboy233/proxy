@@ -126,7 +126,7 @@ cc_library(
     hdrs = ["session-subkey.h"],
     deps = [
         ":pre-shared-key",
-        "//third_party/blake3",
+        "@blake3",
         "@boost.endian",
         "@trunk//base:logging",
         "@trunk//base:types",

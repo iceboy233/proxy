@@ -13,9 +13,7 @@ TlsStream::TlsStream(
     Stream &base_stream,
     boost::asio::ssl::context &ssl_context)
     : base_stream_wrapper_(base_stream, executor),
-      ssl_stream_(base_stream_wrapper_, ssl_context) {
-    // TODO: SSL_set_tlsext_host_name if not numeric host
-}
+      ssl_stream_(base_stream_wrapper_, ssl_context) {}
 
 void TlsStream::handshake(
     absl::AnyInvocable<void(std::error_code) &&> callback) {
@@ -40,11 +38,22 @@ void TlsStream::write(
         std::move(callback));
 }
 
-std::string_view TlsStream::alpn_selected() {
+std::string_view TlsStream::alpn_selected() const {
     const unsigned char *data;
     unsigned int len;
-    SSL_get0_alpn_selected(ssl_stream_.native_handle(), &data, &len);
+    SSL_get0_alpn_selected(
+        const_cast<boost::asio::ssl::stream<StreamWrapper> &>(ssl_stream_)
+            .native_handle(), &data, &len);
     return std::string_view(reinterpret_cast<const char *>(data), len);
+}
+
+void TlsStream::set_host_name_verification(const std::string &host) {
+    ssl_stream_.set_verify_callback(
+        boost::asio::ssl::host_name_verification(host));
+}
+
+void TlsStream::set_tlsext_host_name(const std::string &host) {
+    SSL_set_tlsext_host_name(ssl_stream_.native_handle(), host.c_str());
 }
 
 }  // namespace http

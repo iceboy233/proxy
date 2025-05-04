@@ -1,7 +1,10 @@
 #ifndef _NET_PROXY_HTTP_TLS_STREAM_H
 #define _NET_PROXY_HTTP_TLS_STREAM_H
 
-#include "boost/asio/ssl.hpp"
+#include <string>
+#include <string_view>
+#include <boost/asio/ssl.hpp>
+
 #include "net/interface/stream.h"
 #include "net/proxy/util/stream-wrapper.h"
 
@@ -28,7 +31,9 @@ public:
 
     void close() override { base_stream_wrapper_.stream().close(); }
 
-    std::string_view alpn_selected();
+    std::string_view alpn_selected() const;
+    void set_host_name_verification(const std::string &host);
+    void set_tlsext_host_name(const std::string &host);
 
 private:
     StreamWrapper base_stream_wrapper_;

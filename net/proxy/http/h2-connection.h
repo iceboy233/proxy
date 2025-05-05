@@ -28,6 +28,8 @@ public:
     H2Connection(Stream &stream, const Options &options);
     ~H2Connection();
 
+    void start(absl::AnyInvocable<void() &&> callback);
+
     struct Response {
         uint32_t status_code;
         std::vector<std::pair<std::string, std::string>> headers;
@@ -70,6 +72,7 @@ private:
     absl::FixedArray<uint8_t, 0> read_buffer_;
     bool writing_ = false;
     absl::flat_hash_map<int32_t, ResponseStream> response_streams_;
+    absl::AnyInvocable<void() &&> finish_callback_;
 };
 
 }  // namespace http

@@ -38,12 +38,17 @@ H2Connection::H2Connection(Stream &stream, const Options &options)
         abort();
     }
     nghttp2_session_callbacks_del(callbacks);
-    maybe_write();
-    read();
 }
 
 H2Connection::~H2Connection() {
     nghttp2_session_del(session_);
+}
+
+void H2Connection::start(absl::AnyInvocable<void() &&> callback) {
+    finish_callback_ = std::move(callback);
+    maybe_write();
+    read();
+    // TODO: ping
 }
 
 void H2Connection::request(
@@ -75,7 +80,7 @@ void H2Connection::read() {
         {{read_buffer_.data(), read_buffer_.size()}},
         [this](std::error_code ec, size_t size) {
             if (ec) {
-                LOG(error) << "async_read_some failed: " << ec;
+                LOG(error) << "read failed: " << ec;
                 close();
                 return;
             }
@@ -136,6 +141,7 @@ void H2Connection::close() {
         std::move(response_stream.second.callback)(
             make_error_code(std::errc::connection_aborted), {});
     }
+    std::move(finish_callback_)();
 }
 
 int H2Connection::on_header(

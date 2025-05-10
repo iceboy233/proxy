@@ -29,18 +29,18 @@ private:
         connect,
     };
 
-    void forward_read();
     void forward_dispatch();
     void method_selection();
     void request();
     void connect_ipv4(ConstBufferSpan buffer);
     void connect_ipv6(ConstBufferSpan buffer);
     void connect_host(ConstBufferSpan buffer);
-    void forward_write();
     void reply();
-    void backward_write();
+    void forward_read();
+    void forward_write();
     void backward_dispatch();
     void backward_read();
+    void backward_write();
     void close();
 
     Handler &handler_;
@@ -75,21 +75,6 @@ Handler::TcpConnection::TcpConnection(
       // TODO: find out how to use larger buffers
       forward_buffer_(4096),
       backward_buffer_(4096) {}
-
-void Handler::TcpConnection::forward_read() {
-    stream_->read(
-        {{&forward_buffer_[forward_size_],
-          forward_buffer_.size() - forward_size_}},
-        [connection = boost::intrusive_ptr<TcpConnection>(this)](
-            std::error_code ec, size_t size) {
-            if (ec) {
-                connection->close();
-                return;
-            }
-            connection->forward_size_ += size;
-            connection->forward_dispatch();
-        });
-}
 
 void Handler::TcpConnection::forward_dispatch() {
     switch (state_) {
@@ -162,6 +147,7 @@ void Handler::TcpConnection::request() {
 
 void Handler::TcpConnection::connect_ipv4(ConstBufferSpan buffer) {
     if (buffer.size() < 6) {
+        forward_read();
         return;
     }
     address_v4::bytes_type address_bytes;
@@ -187,6 +173,7 @@ void Handler::TcpConnection::connect_ipv4(ConstBufferSpan buffer) {
 
 void Handler::TcpConnection::connect_ipv6(ConstBufferSpan buffer) {
     if (buffer.size() < 18) {
+        forward_read();
         return;
     }
     address_v6::bytes_type address_bytes;
@@ -212,10 +199,12 @@ void Handler::TcpConnection::connect_ipv6(ConstBufferSpan buffer) {
 
 void Handler::TcpConnection::connect_host(ConstBufferSpan buffer) {
     if (buffer.empty()) {
+        forward_read();
         return;
     }
     size_t host_length = buffer[0];
     if (buffer.size() < 1 + host_length + 2) {
+        forward_read();
         return;
     }
     std::string_view host(
@@ -238,21 +227,6 @@ void Handler::TcpConnection::connect_host(ConstBufferSpan buffer) {
         });
 }
 
-void Handler::TcpConnection::forward_write() {
-    write(
-        *remote_stream_,
-        {forward_buffer_.data(), forward_size_},
-        [connection = boost::intrusive_ptr<TcpConnection>(this)](
-            std::error_code ec) {
-            if (ec) {
-                connection->close();
-                return;
-            }
-            connection->forward_size_ = 0;
-            connection->forward_read();
-        });
-}
-
 void Handler::TcpConnection::reply() {
     backward_buffer_[0] = 5;
     backward_buffer_[1] = 0;
@@ -268,18 +242,33 @@ void Handler::TcpConnection::reply() {
     backward_write();
 }
 
-void Handler::TcpConnection::backward_write() {
+void Handler::TcpConnection::forward_read() {
+    stream_->read(
+        {{&forward_buffer_[forward_size_],
+          forward_buffer_.size() - forward_size_}},
+        [connection = boost::intrusive_ptr<TcpConnection>(this)](
+            std::error_code ec, size_t size) {
+            if (ec) {
+                connection->close();
+                return;
+            }
+            connection->forward_size_ += size;
+            connection->forward_dispatch();
+        });
+}
+
+void Handler::TcpConnection::forward_write() {
     write(
-        *stream_,
-        {backward_buffer_.data(), backward_size_},
+        *remote_stream_,
+        {forward_buffer_.data(), forward_size_},
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec) {
             if (ec) {
                 connection->close();
                 return;
             }
-            connection->backward_size_ = 0;
-            connection->backward_dispatch();
+            connection->forward_size_ = 0;
+            connection->forward_read();
         });
 }
 
@@ -287,7 +276,7 @@ void Handler::TcpConnection::backward_dispatch() {
     switch (state_) {
     case State::method_selection:
     case State::request:
-        forward_read();
+        forward_dispatch();
         break;
     case State::connect:
         backward_read();
@@ -307,6 +296,21 @@ void Handler::TcpConnection::backward_read() {
             }
             connection->backward_size_ += size;
             connection->backward_write();
+        });
+}
+
+void Handler::TcpConnection::backward_write() {
+    write(
+        *stream_,
+        {backward_buffer_.data(), backward_size_},
+        [connection = boost::intrusive_ptr<TcpConnection>(this)](
+            std::error_code ec) {
+            if (ec) {
+                connection->close();
+                return;
+            }
+            connection->backward_size_ = 0;
+            connection->backward_dispatch();
         });
 }
 

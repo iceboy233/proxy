@@ -53,6 +53,8 @@ bool tcp_connect(Proxy &proxy) {
         [&proxy](std::error_code ec, std::unique_ptr<Stream> remote_stream) {
             if (ec) {
                 LOG(error) << "connect failed: " << ec;
+                // TODO(iceboy): Shutdown instead of exit.
+                exit(0);
                 return;
             }
             auto stdio_stream = std::make_unique<system::StdioStream>(

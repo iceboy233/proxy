@@ -12,13 +12,13 @@ namespace system {
 
 Listener::Listener(
     const any_io_executor &executor,
-    const Endpoint &endpoint,
+    const AddrPort &listen,
     Handler &handler,
     const Options &options)
     : executor_(executor),
-      endpoint_(endpoint),
+      listen_(listen),
       handler_(handler),
-      tcp_acceptor_(executor_, endpoint),
+      tcp_acceptor_(executor_, listen_),
       timer_list_(executor_, options.timeout),
       tcp_no_delay_(options.tcp_no_delay),
       accept_error_delay_(options.accept_error_delay),
@@ -70,7 +70,7 @@ void Listener::accept_error_wait() {
 }
 
 void Listener::bind() {
-    udp::socket socket(executor_, endpoint_);
+    udp::socket socket(executor_, listen_);
     handler_.handle_datagram(
         std::make_unique<UdpSocketDatagram>(std::move(socket)));
 }

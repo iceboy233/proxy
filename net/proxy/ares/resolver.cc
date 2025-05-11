@@ -97,7 +97,7 @@ void Resolver::wait() {
     });
 }
 
-void Resolver::set_servers(absl::Span<const Endpoint> servers) {
+void Resolver::set_servers(absl::Span<const AddrPort> servers) {
     auto nodes = std::make_unique<ares_addr_port_node[]>(servers.size());
     for (size_t i = 0; i < servers.size(); ++i) {
         nodes[i].next = i + 1 < servers.size() ? &nodes[i + 1] : nullptr;

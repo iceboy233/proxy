@@ -11,10 +11,10 @@
 #include "absl/functional/any_invocable.h"
 #include "absl/types/span.h"
 #include "net/asio.h"
-#include "net/endpoint.h"
 #include "net/timer-list.h"
 #include "net/interface/connector.h"
 #include "net/proxy/ares/socket.h"
+#include "net/types/addr-port.h"
 #include "util/int-allocator.h"
 
 namespace net {
@@ -26,7 +26,7 @@ public:
     enum class AddressFamily { prefer_v4, prefer_v6, v4_only, v6_only };
 
     struct Options {
-        std::vector<Endpoint> servers;
+        std::vector<AddrPort> servers;
         std::chrono::milliseconds query_timeout = std::chrono::seconds(1);
         std::chrono::nanoseconds cache_timeout = std::chrono::minutes(1);
         AddressFamily address_family = AddressFamily::prefer_v4;
@@ -47,7 +47,7 @@ private:
     class Operation;
 
     void wait();
-    void set_servers(absl::Span<const Endpoint> servers);
+    void set_servers(absl::Span<const AddrPort> servers);
 
     static ares_socket_t asocket(
         int domain, int type, int protocol, void *user_data);

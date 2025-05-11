@@ -9,6 +9,7 @@
 #include "net/proxy/shadowsocks/connector.h"
 #include "net/proxy/shadowsocks/handler.h"
 #include "net/proxy/util/config.h"
+#include "net/types/addr-port.h"
 
 namespace net {
 namespace proxy {
@@ -82,12 +83,12 @@ REGISTER_CONNECTOR(shadowsocks, [](
     auto config = parse_connector_config<ShadowsocksConnectorConfig>(ptree);
     Connector::InitOptions options;
     for (const std::string &server : config.server) {
-        auto server_endpoint = Endpoint::from_string(server);
-        if (!server_endpoint) {
+        auto server_addr_port = AddrPort::from_string(server);
+        if (!server_addr_port) {
             LOG(error) << "invalid server: " << server;
             continue;
         }
-        options.endpoints.push_back(*server_endpoint);
+        options.servers.push_back(*server_addr_port);
     }
     options.method = Method::find(config.method);
     if (!options.method) {

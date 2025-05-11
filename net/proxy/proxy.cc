@@ -5,8 +5,8 @@
 #include <utility>
 
 #include "base/logging.h"
-#include "net/endpoint.h"
 #include "net/proxy/registry.h"
+#include "net/types/addr-port.h"
 
 namespace net {
 namespace proxy {
@@ -44,9 +44,9 @@ void Proxy::create_handlers() {
     for (const auto &pair : handlers_config_) {
         const auto &config = pair.second;
         std::string listen_str = config.get<std::string>("listen", "");
-        auto listen_endpoint = Endpoint::from_string(listen_str);
-        if (!listen_endpoint) {
-            LOG(error) << "invalid listen endpoint: " << listen_str;
+        auto listen_addr_port = AddrPort::from_string(listen_str);
+        if (!listen_addr_port) {
+            LOG(error) << "invalid listen: " << listen_str;
             continue;
         }
         auto handler = Registry::instance().create_handler(*this, config);
@@ -62,7 +62,7 @@ void Proxy::create_handlers() {
         options.tcp_no_delay = config.get<bool>("tcp_no_delay", true);
         options.tcp_fast_open = config.get<int>("tcp_fast_open", 5);
         listeners_.push_back(std::make_unique<system::Listener>(
-            executor_, *listen_endpoint, handler_ref, options));
+            executor_, *listen_addr_port, handler_ref, options));
     }
 }
 

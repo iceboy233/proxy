@@ -9,6 +9,7 @@ cc_library(
         "//net/proxy",
         "//net/proxy/util:config",
         "@trunk//base:logging",
+        "@trunk//net/types:addr-port",
     ],
     alwayslink = 1,
 )
@@ -25,8 +26,8 @@ cc_library(
         "//net/proxy/util:write",
         "@abseil-cpp//absl/random",
         "@trunk//base:logging",
-        "@trunk//net:endpoint",
         "@trunk//net/interface",
+        "@trunk//net/types:addr-port",
     ],
 )
 

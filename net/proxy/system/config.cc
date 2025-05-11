@@ -9,6 +9,7 @@
 #include "net/proxy/registry.h"
 #include "net/proxy/system/connector.h"
 #include "net/proxy/util/config.h"
+#include "net/types/addr-port.h"
 
 namespace net {
 namespace proxy {
@@ -56,12 +57,12 @@ REGISTER_CONNECTOR(system, [](Proxy &proxy, const auto &ptree) {
     options.tcp_no_delay = config.tcp_no_delay;
     options.tcp_fast_open_connect = config.tcp_fast_open_connect;
     for (const std::string &server : config.resolver.server) {
-        auto server_endpoint = Endpoint::from_string(server);
-        if (!server_endpoint) {
+        auto server_addr_port = AddrPort::from_string(server);
+        if (!server_addr_port) {
             LOG(error) << "invalid server: " << server;
             continue;
         }
-        options.resolver_options.servers.push_back(*server_endpoint);
+        options.resolver_options.servers.push_back(*server_addr_port);
     }
     const std::string &address_family = config.resolver.address_family;
     if (address_family == "prefer-v4") {

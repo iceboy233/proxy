@@ -7,11 +7,11 @@
 #include <vector>
 
 #include "absl/random/random.h"
-#include "net/endpoint.h"
 #include "net/interface/connector.h"
 #include "net/proxy/shadowsocks/method.h"
 #include "net/proxy/shadowsocks/pre-shared-key.h"
 #include "net/proxy/shadowsocks/salt-filter.h"
+#include "net/types/addr-port.h"
 
 namespace net {
 namespace proxy {
@@ -26,7 +26,7 @@ public:
     Connector &operator=(const Connector &) = delete;
 
     struct InitOptions {
-        std::vector<Endpoint> endpoints;
+        std::vector<AddrPort> servers;
         const Method *method = &Method::aes_128_gcm();
         std::string password;
         size_t min_padding_length = 1;
@@ -56,8 +56,8 @@ private:
     class TcpStream;
 
     net::Connector &base_connector_;
-    std::vector<Endpoint> endpoints_;
-    std::vector<Endpoint>::iterator endpoints_iter_;
+    std::vector<AddrPort> servers_;
+    std::vector<AddrPort>::iterator servers_iter_;
     PreSharedKey pre_shared_key_;
     size_t min_padding_length_;
     size_t max_padding_length_;

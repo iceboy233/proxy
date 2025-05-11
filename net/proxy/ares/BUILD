@@ -20,9 +20,9 @@ cc_library(
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/types:span",
         "@trunk//net:asio",
-        "@trunk//net:endpoint",
         "@trunk//net:timer-list",
         "@trunk//net/interface",
+        "@trunk//net/types:addr-port",
     ],
 )
 

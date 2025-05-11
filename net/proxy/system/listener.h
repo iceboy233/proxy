@@ -4,9 +4,9 @@
 #include <chrono>
 
 #include "net/asio.h"
-#include "net/endpoint.h"
 #include "net/timer-list.h"
 #include "net/interface/handler.h"
+#include "net/types/addr-port.h"
 
 namespace net {
 namespace proxy {
@@ -24,7 +24,7 @@ public:
 
     Listener(
         const any_io_executor &executor,
-        const Endpoint &endpoint,
+        const AddrPort &listen,
         Handler &handler,
         const Options &options);
 
@@ -34,7 +34,7 @@ private:
     void bind();
 
     any_io_executor executor_;
-    Endpoint endpoint_;
+    AddrPort listen_;
     Handler &handler_;
     tcp::acceptor tcp_acceptor_;
     TimerList timer_list_;

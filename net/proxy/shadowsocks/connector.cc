@@ -64,11 +64,11 @@ private:
 };
 
 bool Connector::init(const InitOptions &options) {
-    endpoints_ = options.endpoints;
-    if (endpoints_.empty()) {
+    servers_ = options.servers;
+    if (servers_.empty()) {
         return false;
     }
-    endpoints_iter_ = endpoints_.begin();
+    servers_iter_ = servers_.begin();
     if (!pre_shared_key_.init(*options.method, options.password)) {
         return false;
     }
@@ -212,13 +212,13 @@ void Connector::TcpStream::start(
 
 void Connector::TcpStream::connect(
     absl::AnyInvocable<void(std::error_code) &&> callback) {
-    const Endpoint &endpoint = *connector_.endpoints_iter_++;
-    if (connector_.endpoints_iter_ == connector_.endpoints_.end()) {
-        connector_.endpoints_iter_ = connector_.endpoints_.begin();
+    const AddrPort &server = *connector_.servers_iter_++;
+    if (connector_.servers_iter_ == connector_.servers_.end()) {
+        connector_.servers_iter_ = connector_.servers_.begin();
     }
     ConstBufferSpan write_buffer = encryptor_.buffer();
     connector_.base_connector_.connect(
-        endpoint,
+        server,
         {write_buffer.data(), write_buffer.size()},
         [this, callback = std::move(callback)](
             std::error_code ec, std::unique_ptr<Stream> stream) mutable {

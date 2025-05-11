@@ -8,6 +8,7 @@ cc_library(
         "//net/proxy",
         "//net/proxy/util:config",
         "@trunk//base:logging",
+        "@trunk//net/types:addr-port",
     ],
     alwayslink = 1,
 )
@@ -38,9 +39,9 @@ cc_library(
         ":udp-socket-datagram",
         "@trunk//base:logging",
         "@trunk//net:asio",
-        "@trunk//net:endpoint",
         "@trunk//net:timer-list",
         "@trunk//net/interface",
+        "@trunk//net/types:addr-port",
     ],
 )
 

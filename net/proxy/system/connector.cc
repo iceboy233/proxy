@@ -44,24 +44,17 @@ Connector::Connector(const any_io_executor &executor, const Options &options)
       tcp_fast_open_connect_(options.tcp_fast_open_connect) {}
 
 void Connector::connect(
-    const tcp::endpoint &endpoint,
+    const HostPort &target,
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
     auto *operation = new ConnectOperation(
         *this, initial_data, std::move(callback));
-    operation->connect(endpoint.address(), endpoint.port());
-}
-
-void Connector::connect(
-    std::string_view host,
-    uint16_t port,
-    const_buffer initial_data,
-    absl::AnyInvocable<void(
-        std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    auto *operation = new ConnectOperation(
-        *this, initial_data, std::move(callback));
-    operation->resolve(host, port);
+    if (target.is_name_port()) {
+        operation->resolve(target.name(), target.port());
+    } else {
+        operation->connect(target.address(), target.port());
+    }
 }
 
 std::error_code Connector::bind(

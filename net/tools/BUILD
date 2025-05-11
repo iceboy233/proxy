@@ -28,6 +28,7 @@ cc_binary(
         "@trunk//base:flags",
         "@trunk//base:logging",
         "@trunk//net:asio",
-        "@trunk//util:strings",
+        "@trunk//net:blocking-result",
+        "@trunk//net/types:host-port",
     ],
 )

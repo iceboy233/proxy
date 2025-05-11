@@ -214,7 +214,8 @@ void Handler::TcpConnection::connect_host(ConstBufferSpan buffer) {
     forward_size_ = 0;
     state_ = State::connect;
     handler_.connector_.connect(
-        host, port, {buffer.data(), buffer.size()},
+        {host, port},
+        {buffer.data(), buffer.size()},
         [connection = boost::intrusive_ptr<TcpConnection>(this)](
             std::error_code ec, std::unique_ptr<Stream> stream) {
             if (ec) {

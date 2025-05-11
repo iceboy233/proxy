@@ -36,14 +36,7 @@ public:
     bool init(const InitOptions &options);
 
     void connect(
-        const tcp::endpoint &endpoint,
-        const_buffer initial_data,
-        absl::AnyInvocable<void(
-            std::error_code, std::unique_ptr<Stream>) &&> callback) override;
-
-    void connect(
-        std::string_view host,
-        uint16_t port,
+        const HostPort &target,
         const_buffer initial_data,
         absl::AnyInvocable<void(
             std::error_code, std::unique_ptr<Stream>) &&> callback) override;

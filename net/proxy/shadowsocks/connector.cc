@@ -1,6 +1,7 @@
 #include "net/proxy/shadowsocks/connector.h"
 
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -19,13 +20,7 @@ public:
     explicit TcpStream(Connector &connector);
 
     void start(
-        const tcp::endpoint &endpoint,
-        const_buffer initial_data,
-        absl::AnyInvocable<void(std::error_code) &&> callback);
-
-    void start(
-        std::string_view host,
-        uint16_t port,
+        const HostPort &target,
         const_buffer initial_data,
         absl::AnyInvocable<void(std::error_code) &&> callback);
 
@@ -78,34 +73,13 @@ bool Connector::init(const InitOptions &options) {
 }
 
 void Connector::connect(
-    const tcp::endpoint &endpoint,
+    const HostPort &target,
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
     auto stream = std::make_unique<TcpStream>(*this);
     stream->start(
-        endpoint,
-        initial_data,
-        [stream = std::move(stream), callback = std::move(callback)](
-            std::error_code ec) mutable {
-            if (ec) {
-                std::move(callback)(ec, nullptr);
-                return;
-            }
-            std::move(callback)({}, std::move(stream));
-        });
-}
-
-void Connector::connect(
-    std::string_view host,
-    uint16_t port,
-    const_buffer initial_data,
-    absl::AnyInvocable<void(
-        std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    auto stream = std::make_unique<TcpStream>(*this);
-    stream->start(
-        host,
-        port,
+        target,
         initial_data,
         [stream = std::move(stream), callback = std::move(callback)](
             std::error_code ec) mutable {
@@ -128,79 +102,61 @@ Connector::TcpStream::TcpStream(Connector &connector)
     : connector_(connector) {}
 
 void Connector::TcpStream::start(
-    const tcp::endpoint &endpoint,
+    const HostPort &target,
     const_buffer initial_data,
     absl::AnyInvocable<void(std::error_code) &&> callback) {
     encryptor_.init(connector_.pre_shared_key_);
     connector_.salt_filter_.insert({
         encryptor_.salt(), connector_.pre_shared_key_.method().salt_size()});
-    // TODO: split chunks if too large
+
+    // Request fixed-length header.
     encryptor_.start_chunk();
-    address address = endpoint.address();
-    size_t address_size = address.is_v4() ? 4 : 16;
-    size_t padding_size = absl::Uniform<size_t>(
-        connector_.bit_gen_,
-        connector_.min_padding_length_,
-        connector_.max_padding_length_);
+    size_t header_size;
+    if (target.is_name_port()) {
+        header_size = 4 + target.name().size();
+    } else if (target.address().is_v4()) {
+        header_size = 7;
+    } else {
+        header_size = 19;
+    }
+    size_t padding_size;
     if (connector_.pre_shared_key_.method().is_spec_2022()) {
         encryptor_.push_u8(0);  // request
         encryptor_.push_big_u64(
             std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::system_clock::now().time_since_epoch()).count());
-        encryptor_.push_big_u16(
-            address_size + padding_size + initial_data.size() + 5);
-    } else {
-        encryptor_.push_big_u16(address_size + initial_data.size() + 3);
+        padding_size = absl::Uniform<size_t>(
+            connector_.bit_gen_,
+            connector_.min_padding_length_,
+            connector_.max_padding_length_);
+        header_size += 2 + padding_size;
     }
+    header_size += initial_data.size();
+    if (header_size > std::numeric_limits<uint16_t>::max()) {
+        std::move(callback)(make_error_code(std::errc::message_size));
+        return;
+    }
+    encryptor_.push_big_u16(header_size);
     encryptor_.finish_chunk();
+
+    // Request variable-length header.
     encryptor_.start_chunk();
-    if (address.is_v4()) {
+    if (target.is_name_port()) {
+        encryptor_.push_u8(3);  // host
+        if (target.name().size() > std::numeric_limits<uint8_t>::max()) {
+            std::move(callback)(make_error_code(std::errc::invalid_argument));
+            return;
+        }
+        encryptor_.push_u8(target.name().size());
+        encryptor_.push_buffer(target.name());
+    } else if (target.address().is_v4()) {
         encryptor_.push_u8(1);  // ipv4
-        encryptor_.push_buffer(address.to_v4().to_bytes());
+        encryptor_.push_buffer(target.address().to_v4().to_bytes());
     } else {
         encryptor_.push_u8(4);  // ipv6
-        encryptor_.push_buffer(address.to_v6().to_bytes());
+        encryptor_.push_buffer(target.address().to_v6().to_bytes());
     }
-    encryptor_.push_big_u16(endpoint.port());
-    if (connector_.pre_shared_key_.method().is_spec_2022()) {
-        encryptor_.push_big_u16(padding_size);
-        encryptor_.push_random(padding_size);
-    }
-    encryptor_.push_buffer({initial_data.data(), initial_data.size()});
-    encryptor_.finish_chunk();
-    connect(std::move(callback));
-}
-
-void Connector::TcpStream::start(
-    std::string_view host,
-    uint16_t port,
-    const_buffer initial_data,
-    absl::AnyInvocable<void(std::error_code) &&> callback) {
-    encryptor_.init(connector_.pre_shared_key_);
-    connector_.salt_filter_.insert({
-        encryptor_.salt(), connector_.pre_shared_key_.method().salt_size()});
-    // TODO: split chunks if too large
-    encryptor_.start_chunk();
-    size_t padding_size = absl::Uniform<size_t>(
-        connector_.bit_gen_,
-        connector_.min_padding_length_,
-        connector_.max_padding_length_);
-    if (connector_.pre_shared_key_.method().is_spec_2022()) {
-        encryptor_.push_u8(0);  // request
-        encryptor_.push_big_u64(
-            std::chrono::duration_cast<std::chrono::seconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count());
-        encryptor_.push_big_u16(
-            host.size() + padding_size + initial_data.size() + 6);
-    } else {
-        encryptor_.push_big_u16(host.size() + initial_data.size() + 4);
-    }
-    encryptor_.finish_chunk();
-    encryptor_.start_chunk();
-    encryptor_.push_u8(3);  // host
-    encryptor_.push_u8(host.size());
-    encryptor_.push_buffer(host);
-    encryptor_.push_big_u16(port);
+    encryptor_.push_big_u16(target.port());
     if (connector_.pre_shared_key_.method().is_spec_2022()) {
         encryptor_.push_big_u16(padding_size);
         encryptor_.push_random(padding_size);

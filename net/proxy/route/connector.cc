@@ -23,34 +23,23 @@ Connector::Connector(absl::Span<Rule const> rules) {
 }
 
 void Connector::connect(
-    const tcp::endpoint &endpoint,
+    const HostPort &target,
     const_buffer initial_data,
     absl::AnyInvocable<void(
         std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    // TODO
-    auto *connector = default_connector_;
+    net::Connector *connector = default_connector_;
+    if (target.is_name_port()) {
+        std::optional<int> index = host_matcher_.match(target.name());
+        if (index) {
+            connector = connectors_[*index];
+        }
+    }
     if (!connector) {
         std::move(callback)(
             make_error_code(std::errc::network_unreachable), nullptr);
         return;
     }
-    connector->connect(endpoint, initial_data, std::move(callback));
-}
-
-void Connector::connect(
-    std::string_view host,
-    uint16_t port,
-    const_buffer initial_data,
-    absl::AnyInvocable<void(
-        std::error_code, std::unique_ptr<Stream>) &&> callback) {
-    std::optional<int> index = host_matcher_.match(host);
-    auto *connector = index ? connectors_[*index] : default_connector_;
-    if (!connector) {
-        std::move(callback)(
-            make_error_code(std::errc::network_unreachable), nullptr);
-        return;
-    }
-    connector->connect(host, port, initial_data, std::move(callback));
+    connector->connect(target, initial_data, std::move(callback));
 }
 
 std::error_code Connector::bind(

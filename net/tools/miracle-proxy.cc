@@ -29,7 +29,7 @@ namespace {
 std::error_code tcp_connect(Proxy &proxy, io_context &io_context) {
     auto *connector = proxy.get_connector(flags::tcp_connect_with);
     if (!connector) {
-        LOG(fatal) << "invalid connector";
+        LOG(error) << "invalid connector";
         return make_error_code(std::errc::invalid_argument);
     }
     BlockingResult<std::error_code, std::unique_ptr<Stream>> connect_result;

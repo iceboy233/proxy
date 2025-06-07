@@ -18,6 +18,7 @@ cc_library(
     srcs = ["echo-handler.cc"],
     hdrs = ["echo-handler.h"],
     deps = [
+        "//net/proxy:const",
         "//net/proxy/util:write",
         "@abseil-cpp//absl/container:fixed_array",
         "@trunk//net/interface",
@@ -29,6 +30,7 @@ cc_library(
     srcs = ["null-handler.cc"],
     hdrs = ["null-handler.h"],
     deps = [
+        "//net/proxy:const",
         "@abseil-cpp//absl/container:fixed_array",
         "@trunk//net/interface",
     ],
@@ -39,6 +41,7 @@ cc_library(
     srcs = ["random-handler.cc"],
     hdrs = ["random-handler.h"],
     deps = [
+        "//net/proxy:const",
         "@abseil-cpp//absl/container:fixed_array",
         "@boringssl//:crypto",
         "@trunk//net/interface",
@@ -50,6 +53,7 @@ cc_library(
     srcs = ["zero-handler.cc"],
     hdrs = ["zero-handler.h"],
     deps = [
+        "//net/proxy:const",
         "@abseil-cpp//absl/container:fixed_array",
         "@trunk//net/interface",
     ],

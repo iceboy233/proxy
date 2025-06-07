@@ -32,6 +32,7 @@ cc_library(
     srcs = ["handler.cc"],
     hdrs = ["handler.h"],
     deps = [
+        "//net/proxy:const",
         "//net/proxy/util:write",
         "@abseil-cpp//absl/algorithm",
         "@abseil-cpp//absl/container:fixed_array",

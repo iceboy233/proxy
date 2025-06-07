@@ -75,8 +75,8 @@ Handler::TcpConnection::TcpConnection(
     std::unique_ptr<Stream> stream)
     : handler_(handler),
       stream_(std::move(stream)),
-      // TODO: find out how to use larger buffer
-      backward_read_buffer_(4096),
+      backward_read_buffer_(
+          handler_.pre_shared_key_.method().buffer_size_hint()),
       write_header_(handler_.pre_shared_key_.method().is_spec_2022()) {}
 
 void Handler::TcpConnection::forward_read() {

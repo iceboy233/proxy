@@ -27,6 +27,7 @@ public:
     size_t salt_size() const { return EVP_AEAD_key_length(aead_); }
     size_t nonce_size() const { return EVP_AEAD_nonce_length(aead_); }
     size_t max_chunk_size() const { return is_spec_2022_ ? 65535 : 16383; }
+    size_t buffer_size_hint() const { return is_spec_2022_ ? 65535 : 65532; }
     bool is_spec_2022() const { return is_spec_2022_; }
 
 private:

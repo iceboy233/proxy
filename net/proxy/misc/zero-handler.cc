@@ -8,6 +8,7 @@
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
 #include "absl/container/fixed_array.h"
+#include "net/proxy/const.h"
 
 namespace net {
 namespace proxy {
@@ -51,8 +52,8 @@ private:
 
 StreamConnection::StreamConnection(std::unique_ptr<Stream> stream)
     : stream_(std::move(stream)),
-      read_buffer_(8192),
-      write_buffer_(8192) {}
+      read_buffer_(stream_buffer_size),
+      write_buffer_(stream_buffer_size) {}
 
 void StreamConnection::read() {
     stream_->read(
@@ -82,8 +83,8 @@ void StreamConnection::write() {
 
 DatagramConnection::DatagramConnection(std::unique_ptr<Datagram> datagram)
     : datagram_(std::move(datagram)),
-      read_buffer_(8192),
-      write_buffer_(8192) {}
+      read_buffer_(datagram_buffer_size),
+      write_buffer_(datagram_buffer_size) {}
 
 void DatagramConnection::read() {
     datagram_->receive_from(

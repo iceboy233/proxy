@@ -17,6 +17,7 @@ cc_library(
     hdrs = ["copy.h"],
     deps = [
         ":write",
+        "//net/proxy:const",
         "@abseil-cpp//absl/container:fixed_array",
         "@abseil-cpp//absl/functional:any_invocable",
         "@trunk//net/interface",

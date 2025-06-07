@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "absl/container/fixed_array.h"
+#include "net/proxy/const.h"
 
 namespace net {
 namespace proxy {
@@ -43,7 +44,7 @@ private:
 
 StreamConnection::StreamConnection(std::unique_ptr<Stream> stream)
     : stream_(std::move(stream)),
-      buffer_(8192) {}
+      buffer_(stream_buffer_size) {}
 
 void StreamConnection::read() {
     stream_->read(
@@ -59,7 +60,7 @@ void StreamConnection::read() {
 
 DatagramConnection::DatagramConnection(std::unique_ptr<Datagram> datagram)
     : datagram_(std::move(datagram)),
-      buffer_(8192) {}
+      buffer_(datagram_buffer_size) {}
 
 void DatagramConnection::read() {
     datagram_->receive_from(

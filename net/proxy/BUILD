@@ -1,6 +1,11 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
+    name = "const",
+    hdrs = ["const.h"],
+)
+
+cc_library(
     name = "proxy",
     srcs = ["proxy.cc"],
     hdrs = ["proxy.h"],

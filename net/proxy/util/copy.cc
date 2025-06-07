@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "absl/container/fixed_array.h"
+#include "net/proxy/const.h"
 #include "net/proxy/util/write.h"
 
 namespace net {
@@ -43,8 +44,8 @@ CopyBidirOperation::CopyBidirOperation(
     : stream0_(std::move(stream0)),
       stream1_(std::move(stream1)),
       callback_(std::move(callback)),
-      forward_buffer_(8192),
-      backward_buffer_(8192) {}
+      forward_buffer_(stream_buffer_size),
+      backward_buffer_(stream_buffer_size) {}
 
 void CopyBidirOperation::start() {
     forward_read();

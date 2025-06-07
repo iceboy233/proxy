@@ -312,11 +312,17 @@ void Connector::TcpStream::write(
     size_t total_size = 0;
     encryptor_.clear();
     for (const_buffer buffer : buffers) {
-        // TODO: split chunks if too large
-        encryptor_.start_chunk();
-        encryptor_.push_big_u16(buffer.size());
-        encryptor_.finish_chunk();
-        encryptor_.write_payload_chunk({buffer.data(), buffer.size()});
+        ConstBufferSpan buffer_span(buffer.data(), buffer.size());
+        while (!buffer_span.empty()) {
+            size_t chunk_size = std::min(
+                buffer_span.size(),
+                connector_.pre_shared_key_.method().max_chunk_size());
+            encryptor_.start_chunk();
+            encryptor_.push_big_u16(chunk_size);
+            encryptor_.finish_chunk();
+            encryptor_.write_payload_chunk(buffer_span.subspan(0, chunk_size));
+            buffer_span.remove_prefix(chunk_size);
+        }
         total_size += buffer.size();
     }
     proxy::write(

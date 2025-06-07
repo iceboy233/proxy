@@ -9,6 +9,7 @@
 #include "absl/container/fixed_array.h"
 #include "base/logging.h"
 #include "base/types.h"
+#include "net/proxy/const.h"
 #include "net/proxy/util/write.h"
 
 namespace net {
@@ -72,9 +73,8 @@ Handler::TcpConnection::TcpConnection(
     std::unique_ptr<Stream> stream)
     : handler_(handler),
       stream_(std::move(stream)),
-      // TODO: find out how to use larger buffers
-      forward_buffer_(4096),
-      backward_buffer_(4096) {}
+      forward_buffer_(stream_buffer_size),
+      backward_buffer_(stream_buffer_size) {}
 
 void Handler::TcpConnection::forward_dispatch() {
     switch (state_) {

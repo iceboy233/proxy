@@ -37,7 +37,6 @@ private:
     enum class State {
         method_selection,
         request,
-        connect,
     };
 
     void dispatch();
@@ -208,7 +207,7 @@ void Connector::TcpStream::request() {
     }};
     if (read_buffer_[1] != 0) {
         std::errc error_code;
-        if (read_buffer_[1] - 1 < error_codes.size()) {
+        if (static_cast<size_t>(read_buffer_[1] - 1) < error_codes.size()) {
             error_code = error_codes[read_buffer_[1] - 1];
         } else {
             error_code = std::errc::protocol_error;
@@ -225,7 +224,8 @@ void Connector::TcpStream::request() {
         read_size_ -= 10;
         break;
     case 3:
-        if (read_size_ < 5 || read_size_ < read_buffer_[5] + 7) {
+        if (read_size_ < 5 ||
+            read_size_ < static_cast<size_t>(read_buffer_[5] + 7)) {
             read();
             return;
         }
@@ -243,7 +243,6 @@ void Connector::TcpStream::request() {
             make_error_code(std::errc::address_family_not_supported));
         return;
     }
-    state_ = State::connect;
     std::move(start_callback_)({});
 }
 

@@ -12,7 +12,7 @@ public:
     void deallocate(T value);
 
 private:
-    absl::btree_set<int> spare_;
+    absl::btree_set<T> spare_;
     T next_ = 1;
 };
 
@@ -22,7 +22,7 @@ T IntAllocator<T>::allocate() {
     if (iter == spare_.end()) {
         return next_++;
     }
-    int value = *iter;
+    T value = *iter;
     spare_.erase(iter);
     return value;
 }

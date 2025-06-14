@@ -282,6 +282,7 @@ void Connector::TcpStream::read(
                 }
             }
             std::move(callback)({}, total_size);
+            return;
         }
     }
 }

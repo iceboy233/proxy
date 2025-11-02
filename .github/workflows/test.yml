@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+env:
+  BAZEL_VERSION: 8.4.2
+
 jobs:
   test:
     runs-on: ubuntu-22.04
@@ -20,7 +23,7 @@ jobs:
         run: |
           apt-get update
           apt-get install build-essential curl git -y
-          curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/8.2.1/bazel-8.2.1-linux-x86_64"
+          curl -fLo /usr/local/bin/bazel "https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-linux-x86_64"
           chmod +x /usr/local/bin/bazel
       - name: Test
         run: |

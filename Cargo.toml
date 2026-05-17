@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+
+[package]
+name = "proxy"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1"
+tokio = { version = "1", features = ["macros", "net", "rt"] }
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"

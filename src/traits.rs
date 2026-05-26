@@ -208,12 +208,14 @@ pub trait Connector: StreamConnector + DatagramConnector + Send + Sync {}
 
 impl<T: StreamConnector + DatagramConnector + Send + Sync> Connector for T {}
 
+#[async_trait]
 pub trait StreamHandler {
-    fn handle_stream(&self, stream: Box<dyn Stream>);
+    async fn handle_stream(&self, stream: Box<dyn Stream>) -> io::Result<()>;
 }
 
+#[async_trait]
 pub trait DatagramHandler {
-    fn handle_datagram(&self, datagram: Box<dyn Datagram>);
+    async fn handle_datagram(&self, datagram: Box<dyn Datagram>) -> io::Result<()>;
 }
 
 pub trait Handler: StreamHandler + DatagramHandler + Send + Sync {}

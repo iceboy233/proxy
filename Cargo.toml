@@ -5,8 +5,12 @@ resolver = "2"
 name = "proxy"
 edition = "2021"
 
+[[example]]
+name = "echo-server"
+
 [dependencies]
 async-trait = "0.1"
+bpaf = { version = "0.9", features = ["bpaf_derive"] }
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt"] }
 
 [profile.release]

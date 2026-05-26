@@ -15,15 +15,16 @@ struct Options {
     // TODO: tcp_connect_with
 }
 
-// TODO: create runtime separately
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     simple_logger::init_with_env()?;
     let options = options().run();
     configs::init();
     let config: Config = toml::from_str(&fs::read_to_string(&options.config)?)?;
     let mut proxy = Proxy::new(config);
     proxy.load();
-    proxy.run().await?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(proxy.run())?;
     Ok(())
 }

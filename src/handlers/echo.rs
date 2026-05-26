@@ -39,8 +39,9 @@ impl DatagramHandler for EchoHandler {
         let mut buf = Box::new_uninit_slice(DATAGRAM_BUFFER_SIZE);
         loop {
             let mut read_buf = ReadBuf::uninit(&mut *buf);
-            let addr = datagram.recv_from(&mut read_buf).await?;
-            datagram.send_to(read_buf.filled(), addr).await?;
+            if let Ok(addr) = datagram.recv_from(&mut read_buf).await {
+                let _ = datagram.send_to(read_buf.filled(), addr).await;
+            }
         }
     }
 }

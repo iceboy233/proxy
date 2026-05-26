@@ -197,6 +197,13 @@ pub trait StreamConnector {
         endpoint: SocketAddr,
         initial_data: &[u8],
     ) -> io::Result<Box<dyn Stream>>;
+
+    async fn connect_host(
+        &self,
+        host: &str,
+        port: u16,
+        initial_data: &[u8],
+    ) -> io::Result<Box<dyn Stream>>;
 }
 
 #[async_trait]

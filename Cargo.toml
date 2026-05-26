@@ -3,6 +3,8 @@ resolver = "2"
 
 [package]
 name = "proxy"
+version = "0.3.0"
+authors = ["iceboy"]
 edition = "2021"
 
 [[example]]

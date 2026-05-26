@@ -1,5 +1,6 @@
 use std::{io, net::SocketAddr, sync::Arc};
 
+use log::error;
 use serde::Deserialize;
 use tokio::task::JoinSet;
 
@@ -39,8 +40,7 @@ impl Proxy {
         let registry = REGISTRY.lock().unwrap();
         for connector_config in &c.connectors {
             if let Err(e) = self.get_connector(&connector_config.name, &registry) {
-                // TODO: log error
-                println!("{:?}", e);
+                error!("get connector failed: {}", e);
             }
         }
 
@@ -50,8 +50,7 @@ impl Proxy {
                 Ok(handler) => {
                     self.handlers.push((handler_config.listen, handler));
                 }
-                // TODO: log error
-                Err(e) => println!("{:?}", e),
+                Err(e) => error!("create handler failed: {}", e),
             }
         }
     }

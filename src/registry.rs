@@ -42,7 +42,7 @@ pub type CreateConnectorFunc = fn(&mut Proxy, &ConnectorConfig) -> io::Result<Ar
 impl Registry {
     pub fn register_handler(&mut self, r#type: &str, func: CreateHandlerFunc) {
         if self.handlers.contains_key(r#type) {
-            // TODO: log fatal error
+            log::error!("duplicate handler type: {}", r#type);
             return;
         }
         self.handlers.insert(r#type.to_string(), func);
@@ -50,7 +50,7 @@ impl Registry {
 
     pub fn register_connector(&mut self, r#type: &str, func: CreateConnectorFunc) {
         if self.connectors.contains_key(r#type) {
-            // TODO: log fatal error
+            log::error!("duplicate connector type: {}", r#type);
             return;
         }
         self.connectors.insert(r#type.to_string(), func);

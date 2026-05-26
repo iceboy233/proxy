@@ -1,6 +1,7 @@
 use std::{io, net::SocketAddr};
 
 use async_trait::async_trait;
+use log::error;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpStream, UdpSocket};
 
@@ -20,8 +21,9 @@ impl StreamConnector for SystemConnector {
     ) -> io::Result<Box<dyn Stream>> {
         let mut stream = TcpStream::connect(endpoint).await?;
         if self.tcp_no_delay {
-            // TODO: log error when failed
-            let _ = stream.set_nodelay(true);
+            if let Err(e) = stream.set_nodelay(true) {
+                error!("set nodelay failed: {}", e);
+            }
         }
         // TODO: support fastopen connect
         if !initial_data.is_empty() {
@@ -39,8 +41,9 @@ impl StreamConnector for SystemConnector {
         // TODO: use asynchronous name resolver
         let mut stream = TcpStream::connect((host, port)).await?;
         if self.tcp_no_delay {
-            // TODO: log error when failed
-            let _ = stream.set_nodelay(true);
+            if let Err(e) = stream.set_nodelay(true) {
+                error!("set nodelay failed: {}", e);
+            }
         }
         // TODO: support fastopen connect
         if !initial_data.is_empty() {

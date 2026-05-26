@@ -18,6 +18,7 @@ struct Options {
 // TODO: create runtime separately
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
+    simple_logger::init_with_env()?;
     let options = options().run();
     configs::init();
     let config: Config = toml::from_str(&fs::read_to_string(&options.config)?)?;

@@ -13,30 +13,34 @@ pub struct EchoHandler;
 
 #[async_trait]
 impl StreamHandler for EchoHandler {
-    async fn handle_stream(&self, stream: Box<dyn Stream>) -> io::Result<()> {
-        let mut s = Box::into_pin(stream);
+    async fn handle_stream(
+        &self,
+        stream: &mut (dyn Stream + Send + Sync + Unpin),
+    ) -> io::Result<()> {
         let mut buf = Box::new_uninit_slice(STREAM_BUFFER_SIZE);
         loop {
             let mut read_buf = ReadBuf::uninit(&mut *buf);
-            s.read_buf(&mut read_buf).await?;
+            stream.read_buf(&mut read_buf).await?;
             let filled = read_buf.filled();
             if filled.is_empty() {
                 return Ok(());
             }
-            s.write_all(filled).await?
+            stream.write_all(filled).await?
         }
     }
 }
 
 #[async_trait]
 impl DatagramHandler for EchoHandler {
-    async fn handle_datagram(&self, datagram: Box<dyn Datagram>) -> io::Result<()> {
-        let mut d = Box::into_pin(datagram);
+    async fn handle_datagram(
+        &self,
+        datagram: &(dyn Datagram + Send + Sync + Unpin),
+    ) -> io::Result<()> {
         let mut buf = Box::new_uninit_slice(DATAGRAM_BUFFER_SIZE);
         loop {
             let mut read_buf = ReadBuf::uninit(&mut *buf);
-            let addr = d.recv_from(&mut read_buf).await?;
-            d.send_to(read_buf.filled(), addr).await?;
+            let addr = datagram.recv_from(&mut read_buf).await?;
+            datagram.send_to(read_buf.filled(), addr).await?;
         }
     }
 }
@@ -50,9 +54,9 @@ mod tests {
     #[tokio::test]
     async fn test_echo_stream() {
         let handler = EchoHandler;
-        let (server, mut client) = duplex(STREAM_BUFFER_SIZE);
+        let (mut server, mut client) = duplex(STREAM_BUFFER_SIZE);
         tokio::spawn(async move {
-            let _ = handler.handle_stream(Box::new(server)).await;
+            let _ = handler.handle_stream(&mut server).await;
         });
 
         let payload = b"test echo stream";
@@ -66,11 +70,11 @@ mod tests {
     #[tokio::test]
     async fn test_echo_datagram() {
         let handler = EchoHandler;
-        let server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let mut server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         let server_addr = server.local_addr().unwrap();
         tokio::spawn(async move {
-            let _ = handler.handle_datagram(Box::new(server)).await;
+            let _ = handler.handle_datagram(&mut server).await;
         });
 
         let payload = b"test echo datagram";

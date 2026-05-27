@@ -8,7 +8,6 @@ use crate::{
     traits::{AsyncRecvFromExt, AsyncSendToExt, Datagram, DatagramHandler, Stream, StreamHandler},
 };
 
-#[derive(Clone)]
 pub struct EchoHandler;
 
 #[async_trait]

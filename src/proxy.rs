@@ -79,12 +79,8 @@ impl Proxy {
                 ));
             }
         };
-        match registry.create_connector(self, &config) {
-            Ok(connector) => {
-                self.connectors.push((name.to_string(), connector.clone()));
-                Ok(connector)
-            }
-            Err(e) => Err(e),
-        }
+        let connector = registry.create_connector(self, &config)?;
+        self.connectors.push((name.to_string(), connector.clone()));
+        Ok(connector)
     }
 }

@@ -196,19 +196,22 @@ pub trait StreamConnector {
         &self,
         endpoint: SocketAddr,
         initial_data: &[u8],
-    ) -> io::Result<Box<dyn Stream + Send + Sync>>;
+    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>>;
 
     async fn connect_host(
         &self,
         host: &str,
         port: u16,
         initial_data: &[u8],
-    ) -> io::Result<Box<dyn Stream + Send + Sync>>;
+    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>>;
 }
 
 #[async_trait]
 pub trait DatagramConnector {
-    async fn bind(&self, endpoint: SocketAddr) -> io::Result<Box<dyn Datagram + Send + Sync>>;
+    async fn bind(
+        &self,
+        endpoint: SocketAddr,
+    ) -> io::Result<Box<dyn Datagram + Send + Sync + Unpin>>;
 }
 
 pub trait Connector: StreamConnector + DatagramConnector {}

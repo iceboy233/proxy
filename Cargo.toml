@@ -13,6 +13,7 @@ name = "echo-server"
 [dependencies]
 async-trait = "0.1"
 bpaf = { version = "0.9", features = ["bpaf_derive"] }
+bytes = "1"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
 simple_logger = "5"

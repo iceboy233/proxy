@@ -18,7 +18,7 @@ impl StreamConnector for SystemConnector {
         &self,
         endpoint: SocketAddr,
         initial_data: &[u8],
-    ) -> io::Result<Box<dyn Stream>> {
+    ) -> io::Result<Box<dyn Stream + Send + Sync>> {
         let mut stream = TcpStream::connect(endpoint).await?;
         if self.tcp_no_delay {
             if let Err(e) = stream.set_nodelay(true) {
@@ -37,7 +37,7 @@ impl StreamConnector for SystemConnector {
         host: &str,
         port: u16,
         initial_data: &[u8],
-    ) -> io::Result<Box<dyn Stream>> {
+    ) -> io::Result<Box<dyn Stream + Send + Sync>> {
         // TODO: use asynchronous name resolver
         let mut stream = TcpStream::connect((host, port)).await?;
         if self.tcp_no_delay {
@@ -55,7 +55,7 @@ impl StreamConnector for SystemConnector {
 
 #[async_trait]
 impl DatagramConnector for SystemConnector {
-    async fn bind(&self, endpoint: SocketAddr) -> io::Result<Box<dyn Datagram>> {
+    async fn bind(&self, endpoint: SocketAddr) -> io::Result<Box<dyn Datagram + Send + Sync>> {
         let socket = UdpSocket::bind(endpoint).await?;
         Ok(Box::new(socket))
     }

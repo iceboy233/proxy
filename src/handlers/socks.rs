@@ -10,15 +10,15 @@ use tokio::io::{copy_bidirectional_with_sizes, AsyncReadExt, AsyncWriteExt};
 
 use crate::{
     constants::STREAM_BUFFER_SIZE,
-    traits::{Datagram, DatagramHandler, Stream, StreamConnector, StreamHandler},
+    traits::{Connector, Datagram, DatagramHandler, Stream, StreamHandler},
 };
 
 pub struct SocksHandler {
-    connector: Arc<dyn StreamConnector + Send + Sync + Unpin>,
+    connector: Arc<dyn Connector + Send + Sync>,
 }
 
 impl SocksHandler {
-    pub fn new(connector: Arc<dyn StreamConnector + Send + Sync + Unpin>) -> Self {
+    pub fn new(connector: Arc<dyn Connector + Send + Sync>) -> Self {
         Self { connector }
     }
 
@@ -137,8 +137,13 @@ impl StreamHandler for SocksHandler {
         let mut src = BytesMut::with_capacity(64);
         self.method_selection(stream, &mut src).await?;
         let mut remote_stream = self.request(stream, &mut src).await?;
-        copy_bidirectional_with_sizes(stream, &mut remote_stream, STREAM_BUFFER_SIZE, STREAM_BUFFER_SIZE)
-            .await?;
+        copy_bidirectional_with_sizes(
+            stream,
+            &mut remote_stream,
+            STREAM_BUFFER_SIZE,
+            STREAM_BUFFER_SIZE,
+        )
+        .await?;
         Ok(())
     }
 }

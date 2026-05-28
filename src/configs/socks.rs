@@ -1,24 +1,48 @@
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
-use crate::{
-    connectors::{socks::SocksConnector, system::SystemConnector},
-    handlers::socks::SocksHandler,
-    registry::REGISTRY,
-};
+use serde::Deserialize;
+
+use crate::{connectors::socks::SocksConnector, handlers::socks::SocksHandler, registry::REGISTRY};
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct SocksHandlerConfig {
+    pub connector: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct SocksConnectorConfig {
+    pub server: String,
+
+    #[serde(default)]
+    pub connector: String,
+}
 
 pub fn init() {
     let mut registry = REGISTRY.lock().unwrap();
 
-    registry.register_handler("socks", |_, _| {
-        // TODO: get connector from registry
-        Ok(Arc::new(SocksHandler::new(Arc::new(SystemConnector::new(true)))))
+    registry.register_handler("socks", |get_connector, config| {
+        let c: SocksHandlerConfig = config
+            .params
+            .try_into()
+            .map_err(|e| io::Error::other(format!("invalid socks handler config: {}", e)))?;
+
+        let connector = get_connector(&c.connector)?;
+
+        Ok(Arc::new(SocksHandler::new(connector)))
     });
 
-    registry.register_connector("socks", |_, _| {
-        // TODO: get connector from registry
-        let connector = Arc::new(SystemConnector::new(true));
-        // TODO: get server from config
-        let server = "127.0.0.1:1080".parse().unwrap();
+    registry.register_connector("socks", |get_connector, config| {
+        let c: SocksConnectorConfig = config
+            .params
+            .try_into()
+            .map_err(|e| io::Error::other(format!("invalid socks connector config: {}", e)))?;
+
+        let connector = get_connector(&c.connector)?;
+
+        let server = c
+            .server
+            .parse()
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid server"))?;
         Ok(Arc::new(SocksConnector::new(connector, server)))
     });
 }

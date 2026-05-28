@@ -13,12 +13,12 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 use crate::traits::{Connector, Datagram, DatagramConnector, Stream, StreamConnector};
 
 pub struct SocksConnector {
-    connector: Arc<dyn Connector + Send + Sync + Unpin>,
+    connector: Arc<dyn Connector + Send + Sync>,
     server: SocketAddr,
 }
 
 impl SocksConnector {
-    pub fn new(connector: Arc<dyn Connector + Send + Sync + Unpin>, server: SocketAddr) -> Self {
+    pub fn new(connector: Arc<dyn Connector + Send + Sync>, server: SocketAddr) -> Self {
         Self { connector, server }
     }
 

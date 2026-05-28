@@ -20,15 +20,15 @@ pub struct Config {
 }
 
 pub struct Proxy {
-    config: Arc<Config>,
+    config: Config,
     handlers: Vec<(SocketAddr, Arc<dyn Handler + Send + Sync>)>,
-    connectors: Vec<(String, Arc<dyn Connector>)>,
+    connectors: Vec<(String, Arc<dyn Connector + Send + Sync>)>,
 }
 
 impl Proxy {
     pub fn new(config: Config) -> Self {
         Self {
-            config: Arc::new(config),
+            config,
             handlers: Vec::new(),
             connectors: Vec::new(),
         }
@@ -36,19 +36,23 @@ impl Proxy {
 
     // TODO: Create objects iteratively.
     pub fn load(&mut self) {
-        let c = self.config.clone();
-        let registry = REGISTRY.lock().unwrap();
-        for connector_config in &c.connectors {
-            if let Err(e) = self.get_connector(&connector_config.name, &registry) {
-                error!("get connector failed: {}", e);
-            }
+        // Add the default unnamed system connector if it doesn't exist.
+        if !self.config.connectors.iter().any(|x| x.name == "") {
+            self.config.connectors.push(ConnectorConfig {
+                name: "".to_string(),
+                r#type: "system".to_string(),
+                params: toml::Table::new(),
+            });
         }
+        let c = self.config.clone();
 
-        // TODO: skip creating handlers if in TCP connect mode
-        for handler_config in &c.handlers {
+        // TODO: get connector instead of creating handlers in TCP connect mode
+        let registry = REGISTRY.lock().unwrap();
+        for handler_config in c.handlers {
+            let listen = handler_config.listen;
             match registry.create_handler(self, handler_config) {
                 Ok(handler) => {
-                    self.handlers.push((handler_config.listen, handler));
+                    self.handlers.push((listen, handler));
                 }
                 Err(e) => error!("create handler failed: {}", e),
             }
@@ -66,7 +70,11 @@ impl Proxy {
         Ok(())
     }
 
-    fn get_connector(&mut self, name: &str, registry: &Registry) -> io::Result<Arc<dyn Connector>> {
+    pub fn get_connector(
+        &mut self,
+        name: &str,
+        registry: &Registry,
+    ) -> io::Result<Arc<dyn Connector + Send + Sync>> {
         if let Some((_, connector)) = self.connectors.iter().find(|(n, _)| n == name) {
             return Ok(connector.clone());
         }
@@ -79,7 +87,7 @@ impl Proxy {
                 ));
             }
         };
-        let connector = registry.create_connector(self, &config)?;
+        let connector = registry.create_connector(self, config)?;
         self.connectors.push((name.to_string(), connector.clone()));
         Ok(connector)
     }

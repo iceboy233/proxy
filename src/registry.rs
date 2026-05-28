@@ -5,6 +5,7 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
+use log::info;
 use serde::Deserialize;
 
 use crate::{
@@ -36,8 +37,11 @@ pub struct Registry {
     connectors: HashMap<String, CreateConnectorFunc>,
 }
 
-pub type CreateHandlerFunc = fn(&mut Proxy, &HandlerConfig) -> io::Result<Arc<dyn Handler + Send + Sync>>;
-pub type CreateConnectorFunc = fn(&mut Proxy, &ConnectorConfig) -> io::Result<Arc<dyn Connector + Send + Sync>>;
+pub type GetConnector<'a> = dyn FnMut(&str) -> io::Result<Arc<dyn Connector + Send + Sync>> + 'a;
+pub type CreateHandlerFunc =
+    fn(&mut GetConnector, HandlerConfig) -> io::Result<Arc<dyn Handler + Send + Sync>>;
+pub type CreateConnectorFunc =
+    fn(&mut GetConnector, ConnectorConfig) -> io::Result<Arc<dyn Connector + Send + Sync>>;
 
 impl Registry {
     pub fn register_handler(&mut self, r#type: &str, func: CreateHandlerFunc) {
@@ -59,10 +63,11 @@ impl Registry {
     pub fn create_handler(
         &self,
         proxy: &mut Proxy,
-        config: &HandlerConfig,
+        config: HandlerConfig,
     ) -> io::Result<Arc<dyn Handler + Send + Sync>> {
+        info!("creating handler \"{}\" of type \"{}\"", &config.name, &config.r#type);
         if let Some(func) = self.handlers.get(&config.r#type) {
-            func(proxy, config)
+            func(&mut |name: &str| proxy.get_connector(name, self), config)
         } else {
             Err(io::Error::new(
                 io::ErrorKind::NotFound,
@@ -74,10 +79,11 @@ impl Registry {
     pub fn create_connector(
         &self,
         proxy: &mut Proxy,
-        config: &ConnectorConfig,
+        config: ConnectorConfig,
     ) -> io::Result<Arc<dyn Connector + Send + Sync>> {
+        info!("creating connector \"{}\" of type \"{}\"", &config.name, &config.r#type);
         if let Some(func) = self.connectors.get(&config.r#type) {
-            func(proxy, config)
+            func(&mut |name: &str| proxy.get_connector(name, self), config)
         } else {
             Err(io::Error::new(
                 io::ErrorKind::NotFound,

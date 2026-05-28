@@ -6,6 +6,7 @@ use crate::{connectors::socks::SocksConnector, handlers::socks::SocksHandler, re
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SocksHandlerConfig {
+    #[serde(default)]
     pub connector: String,
 }
 

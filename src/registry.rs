@@ -15,7 +15,9 @@ use crate::{
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct HandlerConfig {
+    #[serde(default)]
     pub name: String,
+
     pub listen: SocketAddr,
     pub r#type: String,
 

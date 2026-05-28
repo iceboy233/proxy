@@ -1,5 +1,7 @@
 # Proxy
 
+[![Test](https://github.com/iceboy233/proxy/actions/workflows/test.yml/badge.svg)](https://github.com/iceboy233/proxy/actions/workflows/test.yml)
+
 A config-based, composable, multi-protocol proxy.
 
 Note: Proxy is now implemented with Rust. There should be a previous C++

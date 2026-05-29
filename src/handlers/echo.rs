@@ -5,7 +5,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadBuf};
 
 use crate::{
     constants::{DATAGRAM_BUFFER_SIZE, STREAM_BUFFER_SIZE},
-    traits::{AsyncRecvFromExt, AsyncSendToExt, Datagram, DatagramHandler, Stream, StreamHandler},
+    traits::{AsyncRecvFromExt, AsyncSendToExt, AsyncDatagram, DatagramHandler, AsyncStream, StreamHandler},
 };
 
 pub struct EchoHandler;
@@ -14,7 +14,7 @@ pub struct EchoHandler;
 impl StreamHandler for EchoHandler {
     async fn handle_stream(
         &self,
-        stream: &mut (dyn Stream + Send + Sync + Unpin),
+        stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
     ) -> io::Result<()> {
         let mut buf = Box::new_uninit_slice(STREAM_BUFFER_SIZE);
         loop {
@@ -33,7 +33,7 @@ impl StreamHandler for EchoHandler {
 impl DatagramHandler for EchoHandler {
     async fn handle_datagram(
         &self,
-        datagram: &(dyn Datagram + Send + Sync + Unpin),
+        datagram: &(dyn AsyncDatagram + Send + Sync + Unpin),
     ) -> io::Result<()> {
         let mut buf = Box::new_uninit_slice(DATAGRAM_BUFFER_SIZE);
         loop {

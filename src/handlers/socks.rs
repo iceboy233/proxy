@@ -10,7 +10,7 @@ use tokio::io::{copy_bidirectional_with_sizes, AsyncReadExt, AsyncWriteExt};
 
 use crate::{
     constants::STREAM_BUFFER_SIZE,
-    traits::{Connector, Datagram, DatagramHandler, Stream, StreamHandler},
+    traits::{Connector, AsyncDatagram, DatagramHandler, AsyncStream, StreamHandler},
 };
 
 pub struct SocksHandler {
@@ -24,7 +24,7 @@ impl SocksHandler {
 
     async fn method_selection(
         &self,
-        stream: &mut (dyn Stream + Send + Sync + Unpin),
+        stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
     ) -> io::Result<()> {
         while src.len() < 2 {
@@ -49,9 +49,9 @@ impl SocksHandler {
 
     async fn request(
         &self,
-        stream: &mut (dyn Stream + Send + Sync + Unpin),
+        stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
-    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
         while src.len() < 4 {
             stream.read_buf(src).await?;
         }
@@ -72,9 +72,9 @@ impl SocksHandler {
 
     async fn connect_ipv4(
         &self,
-        stream: &mut (dyn Stream + Send + Sync + Unpin),
+        stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
-    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
         while src.len() < 6 {
             stream.read_buf(src).await?;
         }
@@ -89,9 +89,9 @@ impl SocksHandler {
 
     async fn connect_ipv6(
         &self,
-        stream: &mut (dyn Stream + Send + Sync + Unpin),
+        stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
-    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
         while src.len() < 18 {
             stream.read_buf(src).await?;
         }
@@ -106,9 +106,9 @@ impl SocksHandler {
 
     async fn connect_host(
         &self,
-        stream: &mut (dyn Stream + Send + Sync + Unpin),
+        stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
-    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
         while src.len() < 1 {
             stream.read_buf(src).await?;
         }
@@ -132,7 +132,7 @@ impl SocksHandler {
 impl StreamHandler for SocksHandler {
     async fn handle_stream(
         &self,
-        stream: &mut (dyn Stream + Send + Sync + Unpin),
+        stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
     ) -> io::Result<()> {
         let mut src = BytesMut::with_capacity(64);
         self.method_selection(stream, &mut src).await?;
@@ -152,7 +152,7 @@ impl StreamHandler for SocksHandler {
 impl DatagramHandler for SocksHandler {
     async fn handle_datagram(
         &self,
-        _datagram: &(dyn Datagram + Send + Sync + Unpin),
+        _datagram: &(dyn AsyncDatagram + Send + Sync + Unpin),
     ) -> io::Result<()> {
         Err(io::Error::other("datagram is not supported yet"))
     }

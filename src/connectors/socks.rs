@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use bytes::{Buf, BufMut, BytesMut};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
-use crate::traits::{Connector, Datagram, DatagramConnector, Stream, StreamConnector};
+use crate::traits::{Connector, AsyncDatagram, DatagramConnector, AsyncStream, StreamConnector};
 
 pub struct SocksConnector {
     connector: Arc<dyn Connector + Send + Sync>,
@@ -25,7 +25,7 @@ impl SocksConnector {
     async fn method_selection(
         &self,
         src: &mut BytesMut,
-    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
         let mut stream = self.connector.connect(self.server, &[5, 1, 0]).await?;
 
         while src.len() < 2 {
@@ -43,7 +43,7 @@ impl SocksConnector {
 
     async fn request(
         &self,
-        stream: &mut (dyn Stream + Send + Sync + Unpin),
+        stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
         endpoint: SocketAddr,
         initial_data: &[u8],
@@ -72,7 +72,7 @@ impl SocksConnector {
 
     async fn request_host(
         &self,
-        stream: &mut (dyn Stream + Send + Sync + Unpin),
+        stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
         host: &str,
         port: u16,
@@ -95,7 +95,7 @@ impl SocksConnector {
 
     async fn request_reply(
         &self,
-        stream: &mut (dyn Stream + Send + Sync + Unpin),
+        stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
     ) -> io::Result<()> {
         while src.len() < 4 {
@@ -158,7 +158,7 @@ impl StreamConnector for SocksConnector {
         &self,
         endpoint: SocketAddr,
         initial_data: &[u8],
-    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
         let mut src = BytesMut::with_capacity(64);
         let mut stream = self.method_selection(&mut src).await?;
         self.request(&mut stream, &mut src, endpoint, initial_data)
@@ -171,7 +171,7 @@ impl StreamConnector for SocksConnector {
         host: &str,
         port: u16,
         initial_data: &[u8],
-    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
         let mut src = BytesMut::with_capacity(64);
         let mut stream = self.method_selection(&mut src).await?;
         self.request_host(&mut stream, &mut src, host, port, initial_data)
@@ -185,13 +185,13 @@ impl DatagramConnector for SocksConnector {
     async fn bind(
         &self,
         _endpoint: SocketAddr,
-    ) -> io::Result<Box<dyn Datagram + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncDatagram + Send + Sync + Unpin>> {
         Err(io::Error::other("datagram is not supported yet"))
     }
 }
 
 struct TcpStream {
-    stream: Box<dyn Stream + Send + Sync + Unpin>,
+    stream: Box<dyn AsyncStream + Send + Sync + Unpin>,
     src: BytesMut,
 }
 

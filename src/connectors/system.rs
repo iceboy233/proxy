@@ -5,7 +5,7 @@ use log::error;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpStream, UdpSocket};
 
-use crate::traits::{Datagram, DatagramConnector, Stream, StreamConnector};
+use crate::traits::{AsyncDatagram, DatagramConnector, AsyncStream, StreamConnector};
 
 pub struct SystemConnector {
     tcp_no_delay: bool,
@@ -23,7 +23,7 @@ impl StreamConnector for SystemConnector {
         &self,
         endpoint: SocketAddr,
         initial_data: &[u8],
-    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
         let mut stream = TcpStream::connect(endpoint).await?;
         if self.tcp_no_delay {
             if let Err(e) = stream.set_nodelay(true) {
@@ -42,7 +42,7 @@ impl StreamConnector for SystemConnector {
         host: &str,
         port: u16,
         initial_data: &[u8],
-    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
         // TODO: use asynchronous name resolver
         let mut stream = TcpStream::connect((host, port)).await?;
         if self.tcp_no_delay {
@@ -63,7 +63,7 @@ impl DatagramConnector for SystemConnector {
     async fn bind(
         &self,
         endpoint: SocketAddr,
-    ) -> io::Result<Box<dyn Datagram + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncDatagram + Send + Sync + Unpin>> {
         let socket = UdpSocket::bind(endpoint).await?;
         Ok(Box::new(socket))
     }

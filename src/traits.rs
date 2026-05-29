@@ -11,9 +11,9 @@ use tokio::{
     net::UdpSocket,
 };
 
-pub trait Stream: AsyncRead + AsyncWrite {}
+pub trait AsyncStream: AsyncRead + AsyncWrite {}
 
-impl<T: AsyncRead + AsyncWrite> Stream for T {}
+impl<T: AsyncRead + AsyncWrite> AsyncStream for T {}
 
 pub trait AsyncRecvFrom {
     fn poll_recv_from(
@@ -186,9 +186,9 @@ impl<'a, S: AsyncSendTo + Unpin + ?Sized> Future for SendTo<'a, S, [u8]> {
     }
 }
 
-pub trait Datagram: AsyncRecvFrom + AsyncSendTo {}
+pub trait AsyncDatagram: AsyncRecvFrom + AsyncSendTo {}
 
-impl<T: AsyncRecvFrom + AsyncSendTo> Datagram for T {}
+impl<T: AsyncRecvFrom + AsyncSendTo> AsyncDatagram for T {}
 
 #[async_trait]
 pub trait StreamConnector {
@@ -196,14 +196,14 @@ pub trait StreamConnector {
         &self,
         endpoint: SocketAddr,
         initial_data: &[u8],
-    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>>;
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>>;
 
     async fn connect_host(
         &self,
         host: &str,
         port: u16,
         initial_data: &[u8],
-    ) -> io::Result<Box<dyn Stream + Send + Sync + Unpin>>;
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>>;
 }
 
 #[async_trait]
@@ -211,7 +211,7 @@ pub trait DatagramConnector {
     async fn bind(
         &self,
         endpoint: SocketAddr,
-    ) -> io::Result<Box<dyn Datagram + Send + Sync + Unpin>>;
+    ) -> io::Result<Box<dyn AsyncDatagram + Send + Sync + Unpin>>;
 }
 
 pub trait Connector: StreamConnector + DatagramConnector {}
@@ -222,7 +222,7 @@ impl<T: StreamConnector + DatagramConnector> Connector for T {}
 pub trait StreamHandler {
     async fn handle_stream(
         &self,
-        stream: &mut (dyn Stream + Send + Sync + Unpin),
+        stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
     ) -> io::Result<()>;
 }
 
@@ -230,7 +230,7 @@ pub trait StreamHandler {
 pub trait DatagramHandler {
     async fn handle_datagram(
         &self,
-        datagram: &(dyn Datagram + Send + Sync + Unpin),
+        datagram: &(dyn AsyncDatagram + Send + Sync + Unpin),
     ) -> io::Result<()>;
 }
 

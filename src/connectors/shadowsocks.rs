@@ -17,7 +17,7 @@ use crate::{
     protocols::shadowsocks::{
         timestamp, DecryptionKey, EncryptionKey, MasterKey, Method, MAX_SALT_LEN,
     },
-    traits::{self, Connector, Datagram, DatagramConnector, StreamConnector},
+    traits::{AsyncDatagram, AsyncStream, Connector, DatagramConnector, StreamConnector},
 };
 
 pub struct ShadowsocksConnector {
@@ -55,7 +55,7 @@ impl StreamConnector for ShadowsocksConnector {
         &self,
         endpoint: SocketAddr,
         initial_data: &[u8],
-    ) -> io::Result<Box<dyn traits::Stream + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
         todo!("connect is not implemented");
     }
 
@@ -64,7 +64,7 @@ impl StreamConnector for ShadowsocksConnector {
         host: &str,
         port: u16,
         initial_data: &[u8],
-    ) -> io::Result<Box<dyn traits::Stream + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
         let mut dst = BytesMut::with_capacity(STREAM_BUFFER_SIZE);
         let salt = &mut [0u8; MAX_SALT_LEN][..self.method.salt_len()];
         rand::fill(salt);
@@ -127,13 +127,13 @@ impl DatagramConnector for ShadowsocksConnector {
     async fn bind(
         &self,
         _endpoint: SocketAddr,
-    ) -> io::Result<Box<dyn Datagram + Send + Sync + Unpin>> {
+    ) -> io::Result<Box<dyn AsyncDatagram + Send + Sync + Unpin>> {
         Err(io::Error::other("datagram is not supported yet"))
     }
 }
 
 struct TcpStream {
-    framed: Framed<Box<dyn traits::Stream + Send + Sync + Unpin>, Codec>,
+    framed: Framed<Box<dyn AsyncStream + Send + Sync + Unpin>, Codec>,
     current_chunk: Option<Bytes>,
 }
 

@@ -235,8 +235,11 @@ impl AsyncWrite for TcpStream {
         match Pin::new(&mut self.framed).poll_ready(cx) {
             Poll::Ready(Ok(())) => {
                 let len = buf.len().min(self.method.max_chunk_size());
-                let chunk = Bytes::copy_from_slice(&buf[..len]);
-                Poll::Ready(Pin::new(&mut self.framed).start_send(chunk).map(|()| len))
+                Poll::Ready(
+                    Pin::new(&mut self.framed)
+                        .start_send(&buf[..len])
+                        .map(|()| len),
+                )
             }
             Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
             Poll::Pending => Poll::Pending,
@@ -268,10 +271,12 @@ enum DecodeState {
     Discard,
 }
 
-impl Encoder<Bytes> for Codec {
+impl Encoder<&[u8]> for Codec {
     type Error = io::Error;
 
-    fn encode(&mut self, chunk: Bytes, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, chunk: &[u8], dst: &mut BytesMut) -> Result<(), Self::Error> {
+        debug_assert!(chunk.len() <= self.method.max_chunk_size());
+
         let offset = dst.len();
         dst.put_u16(chunk.len() as u16);
         let tag = self.encryption_key.encrypt(&mut dst[offset..]);

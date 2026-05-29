@@ -19,10 +19,18 @@ pub struct HandlerConfig {
     pub name: String,
 
     pub listen: SocketAddr,
+
+    #[serde(default = "default_true")]
+    pub tcp_no_delay: bool,
+
     pub r#type: String,
 
     #[serde(flatten)]
     pub params: toml::Table,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Clone, Debug, Deserialize)]

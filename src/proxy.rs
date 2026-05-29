@@ -21,7 +21,7 @@ pub struct Config {
 
 pub struct Proxy {
     config: Config,
-    handlers: Vec<(SocketAddr, Arc<dyn Handler + Send + Sync>)>,
+    handlers: Vec<(SocketAddr, bool, Arc<dyn Handler + Send + Sync>)>,
     connectors: Vec<(String, Arc<dyn Connector + Send + Sync>)>,
 }
 
@@ -50,9 +50,10 @@ impl Proxy {
         let registry = REGISTRY.lock().unwrap();
         for handler_config in c.handlers {
             let listen = handler_config.listen;
+            let tcp_no_delay = handler_config.tcp_no_delay;
             match registry.create_handler(self, handler_config) {
                 Ok(handler) => {
-                    self.handlers.push((listen, handler));
+                    self.handlers.push((listen, tcp_no_delay, handler));
                 }
                 Err(e) => error!("create handler failed: {}", e),
             }
@@ -61,8 +62,8 @@ impl Proxy {
 
     pub async fn run(&self) -> io::Result<()> {
         let mut set = JoinSet::new();
-        for (listen, handler) in &self.handlers {
-            let listener = Listener::bind(listen).await?;
+        for (listen, tcp_no_delay, handler) in &self.handlers {
+            let listener = Listener::bind(*listen, *tcp_no_delay).await?;
             let h = handler.clone();
             set.spawn(async move { listener.run(h).await });
         }

@@ -7,11 +7,14 @@ use std::{io, net::SocketAddr, sync::Arc};
 struct Options {
     #[bpaf(short, long)]
     listen: SocketAddr,
+
+    #[bpaf(long)]
+    tcp_no_delay: bool,
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> io::Result<()> {
     let options = options().run();
-    let listener = Listener::bind(&options.listen).await?;
+    let listener = Listener::bind(options.listen, options.tcp_no_delay).await?;
     listener.run(Arc::new(EchoHandler)).await
 }

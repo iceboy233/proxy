@@ -50,14 +50,14 @@ impl SocksConnector {
     ) -> io::Result<()> {
         let mut dst = match endpoint {
             SocketAddr::V4(addr) => {
-                let mut dst = BytesMut::with_capacity(10);
+                let mut dst = BytesMut::with_capacity(10 + initial_data.len());
                 dst.put_slice(&[5, 1, 0, 1]);
                 dst.put_slice(&addr.ip().octets());
                 dst.put_u16(addr.port());
                 dst
             }
             SocketAddr::V6(addr) => {
-                let mut dst = BytesMut::with_capacity(22);
+                let mut dst = BytesMut::with_capacity(22 + initial_data.len());
                 dst.put_slice(&[5, 1, 0, 4]);
                 dst.put_slice(&addr.ip().octets());
                 dst.put_u16(addr.port());

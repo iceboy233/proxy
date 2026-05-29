@@ -1,0 +1,6 @@
+[[connectors]]
+name = "proxy"
+type = "shadowsocks"
+server = "127.0.0.1:8388"
+method = "2022-blake3-aes-128-gcm"
+password = "AAAAAAAAAAAAAAAAAAAAAA"

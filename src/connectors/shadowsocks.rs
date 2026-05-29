@@ -62,6 +62,7 @@ impl ShadowsocksConnector {
         let framed = Framed::from_parts(framed_parts);
         Ok(Box::new(TcpStream {
             framed,
+            method: self.method,
             current_chunk: None,
         }))
     }
@@ -189,6 +190,7 @@ impl DatagramConnector for ShadowsocksConnector {
 
 struct TcpStream {
     framed: Framed<Box<dyn AsyncStream + Send + Sync + Unpin>, Codec>,
+    method: Method,
     current_chunk: Option<Bytes>,
 }
 
@@ -226,12 +228,9 @@ impl AsyncWrite for TcpStream {
     ) -> Poll<io::Result<usize>> {
         match Pin::new(&mut self.framed).poll_ready(cx) {
             Poll::Ready(Ok(())) => {
-                let chunk = Bytes::copy_from_slice(buf);
-                Poll::Ready(
-                    Pin::new(&mut self.framed)
-                        .start_send(chunk)
-                        .map(|()| buf.len()),
-                )
+                let len = buf.len().min(self.method.max_chunk_size());
+                let chunk = Bytes::copy_from_slice(&buf[..len]);
+                Poll::Ready(Pin::new(&mut self.framed).start_send(chunk).map(|()| len))
             }
             Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
             Poll::Pending => Poll::Pending,
@@ -279,7 +278,6 @@ impl Encoder<Bytes> for Codec {
     type Error = io::Error;
 
     fn encode(&mut self, chunk: Bytes, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        // TODO: support large chunk
         let offset = dst.len();
         dst.put_u16(chunk.len() as u16);
         let tag = self.encryption_key.encrypt(&mut dst[offset..]);

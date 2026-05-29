@@ -42,6 +42,10 @@ impl Method {
     pub fn tag_len(&self) -> usize {
         self.algorithm().tag_len()
     }
+
+    pub fn max_chunk_size(&self) -> usize {
+        65535
+    }
 }
 
 #[derive(Clone, Copy)]

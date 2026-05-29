@@ -78,12 +78,13 @@ impl SocksConnector {
         port: u16,
         initial_data: &[u8],
     ) -> io::Result<()> {
-        if host.len() > 255 {
-            return Err(io::ErrorKind::InvalidData.into());
-        }
-
         let mut dst = BytesMut::with_capacity(5 + host.len() + 2 + initial_data.len());
-        dst.put_slice(&[5, 1, 0, 3, host.len() as u8]);
+        dst.put_slice(&[5, 1, 0, 3]);
+        dst.put_u8(
+            host.len()
+                .try_into()
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, ""))?,
+        );
         dst.put_slice(host.as_bytes());
         dst.put_u16(port);
         dst.put_slice(initial_data);

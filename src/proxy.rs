@@ -79,16 +79,13 @@ impl Proxy {
         if let Some((_, connector)) = self.connectors.iter().find(|(n, _)| n == name) {
             return Ok(connector.clone());
         }
-        let config = match self.config.connectors.iter().find(|c| c.name == name) {
-            Some(c) => c.clone(),
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "connector not found",
-                ));
-            }
+        let Some(config) = self.config.connectors.iter().find(|c| c.name == name) else {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "connector not found",
+            ));
         };
-        let connector = registry.create_connector(self, config)?;
+        let connector = registry.create_connector(self, config.clone())?;
         self.connectors.push((name.to_string(), connector.clone()));
         Ok(connector)
     }

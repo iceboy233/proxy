@@ -47,6 +47,24 @@ impl ShadowsocksConnector {
             max_padding_len,
         }
     }
+
+    async fn create_stream(
+        &self,
+        mut dst: BytesMut,
+        encryption_key: EncryptionKey,
+    ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
+        let stream = self.connector.connect(self.server, &dst).await?;
+        dst.clear();
+        let codec = Codec::new(self.method, self.master_key, encryption_key);
+        let mut framed_parts = FramedParts::new(stream, codec);
+        framed_parts.read_buf = BytesMut::with_capacity(STREAM_BUFFER_SIZE);
+        framed_parts.write_buf = dst;
+        let framed = Framed::from_parts(framed_parts);
+        Ok(Box::new(TcpStream {
+            framed,
+            current_chunk: None,
+        }))
+    }
 }
 
 #[async_trait]
@@ -56,7 +74,54 @@ impl StreamConnector for ShadowsocksConnector {
         endpoint: SocketAddr,
         initial_data: &[u8],
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
-        todo!("connect is not implemented");
+        let mut dst = BytesMut::with_capacity(STREAM_BUFFER_SIZE);
+        let salt = &mut [0u8; MAX_SALT_LEN][..self.method.salt_len()];
+        rand::fill(salt);
+        let mut encryption_key = EncryptionKey::new(self.method, &self.master_key, salt);
+        dst.put_slice(salt);
+        // TODO: put salt into filter
+
+        // Request fixed-length header.
+        let chunk_offset = dst.len();
+        let mut header_len = if endpoint.is_ipv4() { 7 } else { 19 };
+        // TODO: support legacy methods
+        dst.put_u8(0);
+        dst.put_u64(timestamp());
+        let padding_len = rand::random_range(self.min_padding_len..self.max_padding_len);
+        header_len += 2 + padding_len as usize;
+        header_len += initial_data.len();
+        dst.put_u16(
+            header_len
+                .try_into()
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, ""))?,
+        );
+        let tag = encryption_key.encrypt(&mut dst[chunk_offset..]);
+        dst.put_slice(tag.as_ref());
+
+        // Request variable-length header.
+        let chunk_offset = dst.len();
+        match endpoint {
+            SocketAddr::V4(addr) => {
+                dst.put_u8(1); // ipv4
+                dst.put_slice(addr.ip().octets().as_slice());
+                dst.put_u16(addr.port());
+            }
+            SocketAddr::V6(addr) => {
+                dst.put_u8(4); // ipv6
+                dst.put_slice(addr.ip().octets().as_slice());
+                dst.put_u16(addr.port());
+            }
+        }
+        // TODO: support legacy methods
+        dst.put_u16(padding_len);
+        let padding_offset = dst.len();
+        dst.put_bytes(0, padding_len as usize);
+        rand::fill(&mut dst[padding_offset..]);
+        dst.put_slice(initial_data);
+        let tag = encryption_key.encrypt(&mut dst[chunk_offset..]);
+        dst.put_slice(tag.as_ref());
+
+        self.create_stream(dst, encryption_key).await
     }
 
     async fn connect_host(
@@ -108,17 +173,7 @@ impl StreamConnector for ShadowsocksConnector {
         let tag = encryption_key.encrypt(&mut dst[chunk_offset..]);
         dst.put_slice(tag.as_ref());
 
-        let stream = self.connector.connect(self.server, &dst).await?;
-        dst.clear();
-        let codec = Codec::new(self.method, self.master_key, encryption_key);
-        let mut framed_parts = FramedParts::new(stream, codec);
-        framed_parts.read_buf = BytesMut::with_capacity(STREAM_BUFFER_SIZE);
-        framed_parts.write_buf = dst;
-        let framed = Framed::from_parts(framed_parts);
-        Ok(Box::new(TcpStream {
-            framed,
-            current_chunk: None,
-        }))
+        self.create_stream(dst, encryption_key).await
     }
 }
 

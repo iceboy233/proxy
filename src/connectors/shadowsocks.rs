@@ -50,15 +50,21 @@ impl ShadowsocksConnector {
 
     async fn create_stream(
         &self,
-        mut dst: BytesMut,
+        mut write_buf: BytesMut,
         encryption_key: EncryptionKey,
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
-        let stream = self.connector.connect(self.server, &dst).await?;
-        dst.clear();
-        let codec = Codec::new(self.method, self.master_key, encryption_key);
+        let stream = self.connector.connect(self.server, &write_buf).await?;
+        write_buf.clear();
+        let codec = Codec {
+            method: self.method,
+            master_key: self.master_key,
+            encryption_key,
+            decode_state: DecodeState::Init,
+            decryption_key: None,
+        };
         let mut framed_parts = FramedParts::new(stream, codec);
         framed_parts.read_buf = BytesMut::with_capacity(STREAM_BUFFER_SIZE);
-        framed_parts.write_buf = dst;
+        framed_parts.write_buf = write_buf;
         let framed = Framed::from_parts(framed_parts);
         Ok(Box::new(TcpStream {
             framed,
@@ -260,18 +266,6 @@ enum DecodeState {
     Length,
     Payload(usize),
     Discard,
-}
-
-impl Codec {
-    fn new(method: Method, master_key: MasterKey, encryption_key: EncryptionKey) -> Self {
-        Self {
-            method,
-            master_key,
-            encryption_key,
-            decode_state: DecodeState::Init,
-            decryption_key: None,
-        }
-    }
 }
 
 impl Encoder<Bytes> for Codec {

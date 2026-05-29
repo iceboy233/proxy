@@ -22,7 +22,7 @@ cargo build --release
 To run the proxy:
 
 ```
-target/release/proxy --config examples/socks-server.toml
+target/release/proxy --config examples/shadowsocks-local.toml
 ```
 
 See [examples](examples) directory for some example configurations.

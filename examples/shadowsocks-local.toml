@@ -1,3 +1,8 @@
+[[handlers]]
+listen = "127.0.0.1:1080"
+type = "socks"
+connector = "proxy"
+
 [[connectors]]
 name = "proxy"
 type = "shadowsocks"

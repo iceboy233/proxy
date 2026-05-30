@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use bytes::{Buf, BufMut, BytesMut};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
-use crate::traits::{Connector, AsyncDatagram, DatagramConnector, AsyncStream, StreamConnector};
+use crate::traits::{AsyncDatagram, AsyncStream, Connector, DatagramConnector, StreamConnector};
 
 pub struct SocksConnector {
     connector: Arc<dyn Connector + Send + Sync>,

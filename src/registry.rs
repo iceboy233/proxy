@@ -75,7 +75,10 @@ impl Registry {
         proxy: &mut Proxy,
         config: HandlerConfig,
     ) -> io::Result<Arc<dyn Handler + Send + Sync>> {
-        info!("creating handler \"{}\" of type \"{}\"", &config.name, &config.r#type);
+        info!(
+            "creating handler \"{}\" of type \"{}\"",
+            &config.name, &config.r#type
+        );
         if let Some(func) = self.handlers.get(&config.r#type) {
             func(&mut |name: &str| proxy.get_connector(name, self), config)
         } else {
@@ -91,7 +94,10 @@ impl Registry {
         proxy: &mut Proxy,
         config: ConnectorConfig,
     ) -> io::Result<Arc<dyn Connector + Send + Sync>> {
-        info!("creating connector \"{}\" of type \"{}\"", &config.name, &config.r#type);
+        info!(
+            "creating connector \"{}\" of type \"{}\"",
+            &config.name, &config.r#type
+        );
         if let Some(func) = self.connectors.get(&config.r#type) {
             func(&mut |name: &str| proxy.get_connector(name, self), config)
         } else {

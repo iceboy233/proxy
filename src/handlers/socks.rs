@@ -10,7 +10,7 @@ use tokio::io::{copy_bidirectional_with_sizes, AsyncReadExt, AsyncWriteExt};
 
 use crate::{
     constants::STREAM_BUFFER_SIZE,
-    traits::{Connector, AsyncDatagram, DatagramHandler, AsyncStream, StreamHandler},
+    traits::{AsyncDatagram, AsyncStream, Connector, DatagramHandler, StreamHandler},
 };
 
 pub struct SocksHandler {

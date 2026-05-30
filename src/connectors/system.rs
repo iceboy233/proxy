@@ -5,7 +5,7 @@ use log::error;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpStream, UdpSocket};
 
-use crate::traits::{AsyncDatagram, DatagramConnector, AsyncStream, StreamConnector};
+use crate::traits::{AsyncDatagram, AsyncStream, DatagramConnector, StreamConnector};
 
 pub struct SystemConnector {
     tcp_no_delay: bool,

@@ -5,7 +5,10 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadBuf};
 
 use crate::{
     constants::{DATAGRAM_BUFFER_SIZE, STREAM_BUFFER_SIZE},
-    traits::{AsyncRecvFromExt, AsyncSendToExt, AsyncDatagram, DatagramHandler, AsyncStream, StreamHandler},
+    traits::{
+        AsyncDatagram, AsyncRecvFromExt, AsyncSendToExt, AsyncStream, DatagramHandler,
+        StreamHandler,
+    },
 };
 
 pub struct EchoHandler;

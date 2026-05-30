@@ -91,11 +91,13 @@ impl StreamConnector for ShadowsocksConnector {
         // Request fixed-length header.
         let chunk_offset = dst.len();
         let mut header_len = if endpoint.is_ipv4() { 7 } else { 19 };
-        // TODO: support legacy methods
-        dst.put_u8(0);
-        dst.put_u64(timestamp());
-        let padding_len = rand::random_range(self.min_padding_len..self.max_padding_len);
-        header_len += 2 + padding_len as usize;
+        let mut padding_len = 0;
+        if self.method.is_spec_2022() {
+            dst.put_u8(0);
+            dst.put_u64(timestamp());
+            padding_len = rand::random_range(self.min_padding_len..self.max_padding_len);
+            header_len += 2 + padding_len as usize;
+        }
         header_len += initial_data.len();
         dst.put_u16(
             header_len
@@ -119,11 +121,12 @@ impl StreamConnector for ShadowsocksConnector {
                 dst.put_u16(addr.port());
             }
         }
-        // TODO: support legacy methods
-        dst.put_u16(padding_len);
-        let padding_offset = dst.len();
-        dst.put_bytes(0, padding_len as usize);
-        rand::fill(&mut dst[padding_offset..]);
+        if self.method.is_spec_2022() {
+            dst.put_u16(padding_len);
+            let padding_offset = dst.len();
+            dst.put_bytes(0, padding_len as usize);
+            rand::fill(&mut dst[padding_offset..]);
+        }
         dst.put_slice(initial_data);
         let tag = encryption_key.encrypt(&mut dst[chunk_offset..]);
         dst.put_slice(tag.as_ref());
@@ -147,11 +150,13 @@ impl StreamConnector for ShadowsocksConnector {
         // Request fixed-length header.
         let chunk_offset = dst.len();
         let mut header_len = 4 + host.len();
-        // TODO: support legacy methods
-        dst.put_u8(0);
-        dst.put_u64(timestamp());
-        let padding_len = rand::random_range(self.min_padding_len..self.max_padding_len);
-        header_len += 2 + padding_len as usize;
+        let mut padding_len = 0;
+        if self.method.is_spec_2022() {
+            dst.put_u8(0);
+            dst.put_u64(timestamp());
+            padding_len = rand::random_range(self.min_padding_len..self.max_padding_len);
+            header_len += 2 + padding_len as usize;
+        }
         header_len += initial_data.len();
         dst.put_u16(
             header_len
@@ -171,11 +176,12 @@ impl StreamConnector for ShadowsocksConnector {
         );
         dst.put_slice(host.as_bytes());
         dst.put_u16(port);
-        // TODO: support legacy methods
-        dst.put_u16(padding_len);
-        let padding_offset = dst.len();
-        dst.put_bytes(0, padding_len as usize);
-        rand::fill(&mut dst[padding_offset..]);
+        if self.method.is_spec_2022() {
+            dst.put_u16(padding_len);
+            let padding_offset = dst.len();
+            dst.put_bytes(0, padding_len as usize);
+            rand::fill(&mut dst[padding_offset..]);
+        }
         dst.put_slice(initial_data);
         let tag = encryption_key.encrypt(&mut dst[chunk_offset..]);
         dst.put_slice(tag.as_ref());
@@ -307,8 +313,10 @@ impl Decoder for Codec {
                     self.decryption_key =
                         Some(DecryptionKey::new(self.method, &self.master_key, salt));
                     src.advance(salt_len);
-                    // TODO: goto Length for legacy methods
-                    self.decode_state = DecodeState::Header;
+                    self.decode_state = match self.method.is_spec_2022() {
+                        true => DecodeState::Header,
+                        false => DecodeState::Length,
+                    };
                 }
                 DecodeState::Header => {
                     let read_len = 1 + 8 + salt_len + 2 + tag_len;

@@ -1,29 +1,51 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
+use hkdf::Hkdf;
+use md5::{Digest, Md5};
 use ring::{
     aead::{
         Aad, Algorithm, BoundKey, Nonce, NonceSequence, OpeningKey, SealingKey, Tag, UnboundKey,
-        AES_128_GCM, NONCE_LEN,
+        AES_128_GCM, AES_256_GCM, CHACHA20_POLY1305, NONCE_LEN,
     },
     error::Unspecified,
 };
 use serde::Deserialize;
+use sha1::Sha1;
 
 pub const MAX_KEY_LEN: usize = 32;
 pub const MAX_SALT_LEN: usize = MAX_KEY_LEN;
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub enum Method {
+    #[serde(rename = "aes-128-gcm")]
+    Aes128Gcm,
+
+    #[serde(rename = "aes-256-gcm")]
+    Aes256Gcm,
+
+    #[serde(rename = "chacha20-ietf-poly1305")]
+    Chacha20IetfPoly1305,
+
     #[serde(rename = "2022-blake3-aes-128-gcm")]
     Blake3Aes128Gcm2022,
+
+    #[serde(rename = "2022-blake3-aes-256-gcm")]
+    Blake3Aes256Gcm2022,
+
+    #[serde(rename = "2022-blake3-chacha20-poly1305")]
+    Blake3Chacha20Poly1305_2022,
 }
 
 impl Method {
-    // TODO: support no encryption and non-aead
     pub fn algorithm(&self) -> &'static Algorithm {
         match self {
+            Method::Aes128Gcm => &AES_128_GCM,
+            Method::Aes256Gcm => &AES_256_GCM,
+            Method::Chacha20IetfPoly1305 => &CHACHA20_POLY1305,
             Method::Blake3Aes128Gcm2022 => &AES_128_GCM,
+            Method::Blake3Aes256Gcm2022 => &AES_256_GCM,
+            Method::Blake3Chacha20Poly1305_2022 => &CHACHA20_POLY1305,
         }
     }
 
@@ -44,7 +66,22 @@ impl Method {
     }
 
     pub fn max_chunk_size(&self) -> usize {
-        65535
+        if self.is_spec_2022() {
+            65535
+        } else {
+            16383
+        }
+    }
+
+    pub fn is_spec_2022(&self) -> bool {
+        match self {
+            Method::Aes128Gcm => false,
+            Method::Aes256Gcm => false,
+            Method::Chacha20IetfPoly1305 => false,
+            Method::Blake3Aes128Gcm2022 => true,
+            Method::Blake3Aes256Gcm2022 => true,
+            Method::Blake3Chacha20Poly1305_2022 => true,
+        }
     }
 }
 
@@ -53,30 +90,44 @@ pub struct MasterKey([u8; MAX_KEY_LEN]);
 
 impl MasterKey {
     pub fn new(method: Method, password: &str) -> Option<Self> {
-        let mut key: [u8; 32] = [0u8; MAX_KEY_LEN];
-
-        // TODO: support legacy methods
-        let decoded_len = base64::engine::general_purpose::STANDARD_NO_PAD
-            .decode_slice(password, &mut key)
-            .ok()?;
-        if decoded_len != method.key_len() {
-            return None;
+        let mut key = [0u8; MAX_KEY_LEN];
+        if method.is_spec_2022() {
+            let decoded_len = base64::engine::general_purpose::STANDARD_NO_PAD
+                .decode_slice(password, &mut key)
+                .ok()?;
+            if decoded_len != method.key_len() {
+                return None;
+            }
+        } else {
+            let mut md5 = Md5::new();
+            md5.update(password);
+            key[..16].copy_from_slice(md5.finalize_reset().as_slice());
+            if method.key_len() > 16 {
+                md5.update(&key[..16]);
+                md5.update(password);
+                key[16..].copy_from_slice(md5.finalize().as_slice());
+            }
         }
-
         Some(Self(key))
     }
 
     fn derive(&self, method: Method, salt: &[u8]) -> UnboundKey {
         debug_assert_eq!(salt.len(), method.salt_len());
 
-        // TODO: support legacy methods
-        let mut hasher = blake3::Hasher::new_derive_key("shadowsocks 2022 session subkey");
-        hasher.update(&self.0[..method.key_len()]);
-        hasher.update(salt);
-        let hash = hasher.finalize();
-        let derived_key = &hash.as_bytes()[..method.key_len()];
-        let algorithm = method.algorithm();
-        UnboundKey::new(algorithm, derived_key).unwrap()
+        let key = &self.0[..method.key_len()];
+        let mut derived_key = [0u8; MAX_KEY_LEN];
+        if method.is_spec_2022() {
+            let hash = blake3::Hasher::new_derive_key("shadowsocks 2022 session subkey")
+                .update(key)
+                .update(salt)
+                .finalize();
+            derived_key.copy_from_slice(hash.as_slice());
+        } else {
+            Hkdf::<Sha1>::new(Some(salt), key)
+                .expand(b"ss-subkey", &mut derived_key)
+                .unwrap();
+        }
+        UnboundKey::new(method.algorithm(), &derived_key[..method.key_len()]).unwrap()
     }
 }
 

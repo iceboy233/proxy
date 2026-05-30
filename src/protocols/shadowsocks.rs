@@ -67,7 +67,7 @@ impl MasterKey {
     }
 
     fn derive(&self, method: Method, salt: &[u8]) -> UnboundKey {
-        assert_eq!(salt.len(), method.salt_len());
+        debug_assert_eq!(salt.len(), method.salt_len());
 
         // TODO: support legacy methods
         let mut hasher = blake3::Hasher::new_derive_key("shadowsocks 2022 session subkey");
@@ -105,8 +105,8 @@ impl DecryptionKey {
         Self(OpeningKey::new(derived_key, nonce_counter))
     }
 
-    pub fn decrypt<'a>(&mut self, in_out: &'a mut [u8]) -> Option<&'a mut [u8]> {
-        self.0.open_in_place(Aad::empty(), in_out).ok()
+    pub fn decrypt(&mut self, in_out: &mut [u8]) -> bool {
+        self.0.open_in_place(Aad::empty(), in_out).is_ok()
     }
 }
 

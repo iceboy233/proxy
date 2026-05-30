@@ -315,63 +315,58 @@ impl Decoder for Codec {
                     if src.len() < read_len {
                         return Ok(None);
                     }
-                    let Some(chunk) = self
+                    if !self
                         .decryption_key
                         .as_mut()
                         .unwrap()
                         .decrypt(&mut src[..read_len])
-                    else {
+                    {
                         self.decode_state = DecodeState::Discard;
                         continue;
                     };
-                    let mut chunk: &[u8] = chunk;
-                    if chunk.get_u8() != 1 {
+                    if src.get_u8() != 1 {
                         self.decode_state = DecodeState::Discard;
                         continue;
                     }
-                    chunk.get_u64(); // TODO: verify timestamp
-                    let _salt = &chunk[..salt_len];
-                    // TODO: verify salt
-                    chunk = &chunk[salt_len..];
-                    let payload_len = chunk.get_u16() as usize;
-                    src.advance(read_len);
+                    let _timestamp: u64 = src.get_u64(); // TODO: verify timestamp
+                    let _salt = &src[..salt_len]; // TODO: verify salt
+                    src.advance(salt_len);
+                    let payload_len = src.get_u16() as usize;
+                    src.advance(tag_len);
                     self.decode_state = DecodeState::Payload(payload_len);
                 }
                 DecodeState::Length => {
-                    let read_len = 2 + tag_len;
-                    if src.len() < read_len {
+                    if src.len() < 2 + tag_len {
                         return Ok(None);
                     }
-                    let Some(chunk) = self
+                    if !self
                         .decryption_key
                         .as_mut()
                         .unwrap()
-                        .decrypt(&mut src[..read_len])
-                    else {
+                        .decrypt(&mut src[..2 + tag_len])
+                    {
                         self.decode_state = DecodeState::Discard;
                         continue;
                     };
-                    let mut chunk: &[u8] = chunk;
-                    let payload_len = chunk.get_u16() as usize;
-                    src.advance(read_len);
+                    let payload_len = src.get_u16() as usize;
+                    src.advance(tag_len);
                     self.decode_state = DecodeState::Payload(payload_len);
                 }
                 DecodeState::Payload(len) => {
-                    let read_len = len + tag_len;
-                    if src.len() < read_len {
+                    if src.len() < len + tag_len {
                         return Ok(None);
                     }
-                    let Some(chunk) = self
+                    if !self
                         .decryption_key
                         .as_mut()
                         .unwrap()
-                        .decrypt(&mut src[..read_len])
-                    else {
+                        .decrypt(&mut src[..len + tag_len])
+                    {
                         self.decode_state = DecodeState::Discard;
                         continue;
                     };
-                    let bytes = Bytes::copy_from_slice(chunk);
-                    src.advance(read_len);
+                    let bytes = src.split_to(len).freeze();
+                    src.advance(tag_len);
                     self.decode_state = DecodeState::Length;
                     return Ok(Some(bytes));
                 }

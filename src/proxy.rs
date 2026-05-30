@@ -26,7 +26,16 @@ pub struct Proxy {
 }
 
 impl Proxy {
-    pub fn new(config: Config) -> Self {
+    pub fn new(mut config: Config) -> Self {
+        // Add the default unnamed system connector if it doesn't exist.
+        if !config.connectors.iter().any(|x| x.name == "") {
+            config.connectors.push(ConnectorConfig {
+                name: "".to_string(),
+                r#type: "system".to_string(),
+                params: toml::Table::new(),
+            });
+        }
+
         Self {
             config,
             handlers: Vec::new(),
@@ -34,19 +43,8 @@ impl Proxy {
         }
     }
 
-    // TODO: Create objects iteratively.
-    pub fn load(&mut self) {
-        // Add the default unnamed system connector if it doesn't exist.
-        if !self.config.connectors.iter().any(|x| x.name == "") {
-            self.config.connectors.push(ConnectorConfig {
-                name: "".to_string(),
-                r#type: "system".to_string(),
-                params: toml::Table::new(),
-            });
-        }
+    pub fn create_handlers(&mut self) {
         let c = self.config.clone();
-
-        // TODO: get connector instead of creating handlers in TCP connect mode
         let registry = REGISTRY.lock().unwrap();
         for handler_config in c.handlers {
             let listen = handler_config.listen;

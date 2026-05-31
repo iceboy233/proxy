@@ -1,22 +1,12 @@
-use std::{
-    io,
-    net::SocketAddr,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::{io, net::SocketAddr, sync::Arc};
 
 use async_trait::async_trait;
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use futures_util::{Sink, Stream};
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-use tokio_util::codec::{Decoder, Encoder, Framed, FramedParts};
+use bytes::{BufMut, BytesMut};
+use tokio_util::codec::{Encoder, Framed, FramedParts};
 
 use crate::{
     constants::STREAM_BUFFER_SIZE,
-    protocols::shadowsocks::{
-        timestamp, DecryptionKey, EncryptionKey, MasterKey, Method, MAX_SALT_LEN,
-    },
+    protocols::shadowsocks::{Codec, CodecKind, MasterKey, Method, ShadowsocksStream},
     traits::{AsyncDatagram, AsyncStream, Connector, DatagramConnector, StreamConnector},
 };
 
@@ -51,26 +41,16 @@ impl ShadowsocksConnector {
     async fn create_stream(
         &self,
         mut write_buf: BytesMut,
-        encryption_key: EncryptionKey,
+        codec: Codec,
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
-        let stream = self.connector.connect(self.server, &write_buf).await?;
+        let remote_stream = self.connector.connect(self.server, &write_buf).await?;
         write_buf.clear();
-        let codec = Codec {
-            method: self.method,
-            master_key: self.master_key,
-            encryption_key,
-            decode_state: DecodeState::Init,
-            decryption_key: None,
-        };
-        let mut framed_parts = FramedParts::new(stream, codec);
+        let mut framed_parts = FramedParts::new(remote_stream, codec);
         framed_parts.read_buf = BytesMut::with_capacity(STREAM_BUFFER_SIZE);
         framed_parts.write_buf = write_buf;
         let framed = Framed::from_parts(framed_parts);
-        Ok(Box::new(TcpStream {
-            framed,
-            method: self.method,
-            current_chunk: None,
-        }))
+        let stream = ShadowsocksStream::new(framed, self.method.max_chunk_size());
+        Ok(Box::new(stream))
     }
 }
 
@@ -81,57 +61,36 @@ impl StreamConnector for ShadowsocksConnector {
         endpoint: SocketAddr,
         initial_data: &[u8],
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
-        let mut dst = BytesMut::with_capacity(STREAM_BUFFER_SIZE);
-        let salt = &mut [0u8; MAX_SALT_LEN][..self.method.salt_len()];
-        rand::fill(salt);
-        let mut encryption_key = EncryptionKey::new(self.method, &self.master_key, salt);
-        dst.put_slice(salt);
+        let mut write_buf = BytesMut::with_capacity(STREAM_BUFFER_SIZE);
+        write_buf.resize(self.method.salt_len(), 0);
+        rand::fill(&mut write_buf);
         // TODO: put salt into filter
+        let mut codec = Codec::new(CodecKind::Client, self.method, self.master_key, &write_buf);
 
-        // Request fixed-length header.
-        let chunk_offset = dst.len();
-        let mut header_len = if endpoint.is_ipv4() { 7 } else { 19 };
-        let mut padding_len = 0;
-        if self.method.is_spec_2022() {
-            dst.put_u8(0);
-            dst.put_u64(timestamp());
-            padding_len = rand::random_range(self.min_padding_len..self.max_padding_len);
-            header_len += 2 + padding_len as usize;
-        }
-        header_len += initial_data.len();
-        dst.put_u16(
-            header_len
-                .try_into()
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, ""))?,
-        );
-        let tag = encryption_key.encrypt(&mut dst[chunk_offset..]);
-        dst.put_slice(tag.as_ref());
-
-        // Request variable-length header.
-        let chunk_offset = dst.len();
+        let mut dst = BytesMut::new();
         match endpoint {
             SocketAddr::V4(addr) => {
                 dst.put_u8(1); // ipv4
-                dst.put_slice(addr.ip().octets().as_slice());
+                dst.put_u32(addr.ip().to_bits());
                 dst.put_u16(addr.port());
             }
             SocketAddr::V6(addr) => {
                 dst.put_u8(4); // ipv6
-                dst.put_slice(addr.ip().octets().as_slice());
+                dst.put_u128(addr.ip().to_bits());
                 dst.put_u16(addr.port());
             }
         }
         if self.method.is_spec_2022() {
+            let padding_len = rand::random_range(self.min_padding_len..self.max_padding_len);
             dst.put_u16(padding_len);
             let padding_offset = dst.len();
             dst.put_bytes(0, padding_len as usize);
             rand::fill(&mut dst[padding_offset..]);
         }
         dst.put_slice(initial_data);
-        let tag = encryption_key.encrypt(&mut dst[chunk_offset..]);
-        dst.put_slice(tag.as_ref());
+        codec.encode(&dst, &mut write_buf).unwrap();
 
-        self.create_stream(dst, encryption_key).await
+        self.create_stream(write_buf, codec).await
     }
 
     async fn connect_host(
@@ -140,34 +99,13 @@ impl StreamConnector for ShadowsocksConnector {
         port: u16,
         initial_data: &[u8],
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
-        let mut dst = BytesMut::with_capacity(STREAM_BUFFER_SIZE);
-        let salt = &mut [0u8; MAX_SALT_LEN][..self.method.salt_len()];
-        rand::fill(salt);
-        let mut encryption_key = EncryptionKey::new(self.method, &self.master_key, salt);
-        dst.put_slice(salt);
+        let mut write_buf = BytesMut::with_capacity(STREAM_BUFFER_SIZE);
+        write_buf.resize(self.method.salt_len(), 0);
+        rand::fill(&mut write_buf);
         // TODO: put salt into filter
+        let mut codec = Codec::new(CodecKind::Client, self.method, self.master_key, &write_buf);
 
-        // Request fixed-length header.
-        let chunk_offset = dst.len();
-        let mut header_len = 4 + host.len();
-        let mut padding_len = 0;
-        if self.method.is_spec_2022() {
-            dst.put_u8(0);
-            dst.put_u64(timestamp());
-            padding_len = rand::random_range(self.min_padding_len..self.max_padding_len);
-            header_len += 2 + padding_len as usize;
-        }
-        header_len += initial_data.len();
-        dst.put_u16(
-            header_len
-                .try_into()
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, ""))?,
-        );
-        let tag = encryption_key.encrypt(&mut dst[chunk_offset..]);
-        dst.put_slice(tag.as_ref());
-
-        // Request variable-length header.
-        let chunk_offset = dst.len();
+        let mut dst = BytesMut::new();
         dst.put_u8(3); // host
         dst.put_u8(
             host.len()
@@ -177,16 +115,17 @@ impl StreamConnector for ShadowsocksConnector {
         dst.put_slice(host.as_bytes());
         dst.put_u16(port);
         if self.method.is_spec_2022() {
+            let padding_len = rand::random_range(self.min_padding_len..self.max_padding_len);
             dst.put_u16(padding_len);
             let padding_offset = dst.len();
             dst.put_bytes(0, padding_len as usize);
             rand::fill(&mut dst[padding_offset..]);
         }
         dst.put_slice(initial_data);
-        let tag = encryption_key.encrypt(&mut dst[chunk_offset..]);
-        dst.put_slice(tag.as_ref());
+        codec.encode(&dst, &mut write_buf).unwrap();
+        dst.clear();
 
-        self.create_stream(dst, encryption_key).await
+        self.create_stream(write_buf, codec).await
     }
 }
 
@@ -197,192 +136,5 @@ impl DatagramConnector for ShadowsocksConnector {
         _endpoint: SocketAddr,
     ) -> io::Result<Box<dyn AsyncDatagram + Send + Sync + Unpin>> {
         Err(io::Error::other("datagram is not supported yet"))
-    }
-}
-
-struct TcpStream {
-    framed: Framed<Box<dyn AsyncStream + Send + Sync + Unpin>, Codec>,
-    method: Method,
-    current_chunk: Option<Bytes>,
-}
-
-impl AsyncRead for TcpStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        loop {
-            if let Some(ref mut chunk) = self.current_chunk {
-                let len = chunk.len().min(buf.remaining());
-                buf.put_slice(&chunk[..len]);
-                chunk.advance(len);
-                if chunk.is_empty() {
-                    self.current_chunk = None;
-                }
-                return Poll::Ready(Ok(()));
-            }
-            match Pin::new(&mut self.framed).poll_next(cx) {
-                Poll::Ready(Some(Ok(chunk))) => self.current_chunk = Some(chunk),
-                Poll::Ready(Some(Err(e))) => return Poll::Ready(Err(e)),
-                Poll::Ready(None) => return Poll::Ready(Ok(())),
-                Poll::Pending => return Poll::Pending,
-            }
-        }
-    }
-}
-
-impl AsyncWrite for TcpStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        match Pin::new(&mut self.framed).poll_ready(cx) {
-            Poll::Ready(Ok(())) => {
-                let len = buf.len().min(self.method.max_chunk_size());
-                Poll::Ready(
-                    Pin::new(&mut self.framed)
-                        .start_send(&buf[..len])
-                        .map(|()| len),
-                )
-            }
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-            Poll::Pending => Poll::Pending,
-        }
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.framed).poll_flush(cx)
-    }
-
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.framed).poll_close(cx)
-    }
-}
-
-struct Codec {
-    method: Method,
-    master_key: MasterKey,
-    encryption_key: EncryptionKey,
-    decryption_key: Option<DecryptionKey>,
-    decode_state: DecodeState,
-}
-
-enum DecodeState {
-    Init,
-    Header,
-    Length,
-    Payload(usize),
-    Discard,
-}
-
-impl Encoder<&[u8]> for Codec {
-    type Error = io::Error;
-
-    fn encode(&mut self, chunk: &[u8], dst: &mut BytesMut) -> Result<(), Self::Error> {
-        debug_assert!(chunk.len() <= self.method.max_chunk_size());
-
-        let offset = dst.len();
-        dst.put_u16(chunk.len() as u16);
-        let tag = self.encryption_key.encrypt(&mut dst[offset..]);
-        dst.put_slice(tag.as_ref());
-
-        let offset = dst.len();
-        dst.put_slice(&chunk);
-        let tag = self.encryption_key.encrypt(&mut dst[offset..]);
-        dst.put_slice(tag.as_ref());
-        Ok(())
-    }
-}
-
-impl Decoder for Codec {
-    type Item = Bytes;
-    type Error = io::Error;
-
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let salt_len = self.method.salt_len();
-        let tag_len = self.method.tag_len();
-        loop {
-            match self.decode_state {
-                DecodeState::Init => {
-                    if src.len() < salt_len {
-                        return Ok(None);
-                    }
-                    let salt = &src[..salt_len];
-                    self.decryption_key =
-                        Some(DecryptionKey::new(self.method, &self.master_key, salt));
-                    src.advance(salt_len);
-                    self.decode_state = match self.method.is_spec_2022() {
-                        true => DecodeState::Header,
-                        false => DecodeState::Length,
-                    };
-                }
-                DecodeState::Header => {
-                    let read_len = 1 + 8 + salt_len + 2 + tag_len;
-                    if src.len() < read_len {
-                        return Ok(None);
-                    }
-                    if !self
-                        .decryption_key
-                        .as_mut()
-                        .unwrap()
-                        .decrypt(&mut src[..read_len])
-                    {
-                        self.decode_state = DecodeState::Discard;
-                        continue;
-                    };
-                    if src.get_u8() != 1 {
-                        self.decode_state = DecodeState::Discard;
-                        continue;
-                    }
-                    let _timestamp: u64 = src.get_u64(); // TODO: verify timestamp
-                    let _salt = &src[..salt_len]; // TODO: verify salt
-                    src.advance(salt_len);
-                    let payload_len = src.get_u16() as usize;
-                    src.advance(tag_len);
-                    self.decode_state = DecodeState::Payload(payload_len);
-                }
-                DecodeState::Length => {
-                    if src.len() < 2 + tag_len {
-                        return Ok(None);
-                    }
-                    if !self
-                        .decryption_key
-                        .as_mut()
-                        .unwrap()
-                        .decrypt(&mut src[..2 + tag_len])
-                    {
-                        self.decode_state = DecodeState::Discard;
-                        continue;
-                    };
-                    let payload_len = src.get_u16() as usize;
-                    src.advance(tag_len);
-                    self.decode_state = DecodeState::Payload(payload_len);
-                }
-                DecodeState::Payload(len) => {
-                    if src.len() < len + tag_len {
-                        return Ok(None);
-                    }
-                    if !self
-                        .decryption_key
-                        .as_mut()
-                        .unwrap()
-                        .decrypt(&mut src[..len + tag_len])
-                    {
-                        self.decode_state = DecodeState::Discard;
-                        continue;
-                    };
-                    let bytes = src.split_to(len).freeze();
-                    src.advance(tag_len);
-                    self.decode_state = DecodeState::Length;
-                    return Ok(Some(bytes));
-                }
-                DecodeState::Discard => {
-                    src.clear();
-                    return Ok(None);
-                }
-            }
-        }
     }
 }

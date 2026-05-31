@@ -31,13 +31,12 @@ impl SocksConnector {
         while src.len() < 2 {
             stream.read_buf(src).await?;
         }
-        if src[0] != 5 {
+        if src.get_u8() != 5 {
             return Err(io::ErrorKind::Unsupported.into());
         }
-        if src[1] != 0 {
+        if src.get_u8() != 0 {
             return Err(io::ErrorKind::InvalidData.into());
         }
-        src.advance(2);
         Ok(stream)
     }
 
@@ -52,14 +51,14 @@ impl SocksConnector {
             SocketAddr::V4(addr) => {
                 let mut dst = BytesMut::with_capacity(10 + initial_data.len());
                 dst.put_slice(&[5, 1, 0, 1]);
-                dst.put_slice(&addr.ip().octets());
+                dst.put_u32(addr.ip().to_bits());
                 dst.put_u16(addr.port());
                 dst
             }
             SocketAddr::V6(addr) => {
                 let mut dst = BytesMut::with_capacity(22 + initial_data.len());
                 dst.put_slice(&[5, 1, 0, 4]);
-                dst.put_slice(&addr.ip().octets());
+                dst.put_u128(addr.ip().to_bits());
                 dst.put_u16(addr.port());
                 dst
             }
@@ -101,11 +100,12 @@ impl SocksConnector {
         while src.len() < 4 {
             stream.read_buf(src).await?;
         }
-        if src[0] != 5 {
+        if src.get_u8() != 5 {
             return Err(io::ErrorKind::Unsupported.into());
         }
-        if src[1] != 0 {
-            let kind = match src[1] {
+        let rep = src.get_u8();
+        if rep != 0 {
+            let kind = match rep {
                 1 => io::ErrorKind::ConnectionAborted,
                 2 => io::ErrorKind::PermissionDenied,
                 3 => io::ErrorKind::NetworkUnreachable,
@@ -118,31 +118,32 @@ impl SocksConnector {
             };
             return Err(io::Error::new(kind, ""));
         }
-        match src[3] {
+        src.get_u8();
+        match src.get_u8() {
+            // ipv4
             1 => {
-                // ipv4
-                while src.len() < 10 {
+                while src.len() < 6 {
                     stream.read_buf(src).await?;
                 }
-                src.advance(10);
+                src.advance(6);
             }
+            // ipv6
             4 => {
-                // ipv6
-                while src.len() < 22 {
+                while src.len() < 18 {
                     stream.read_buf(src).await?;
                 }
-                src.advance(22);
+                src.advance(18);
             }
+            // host
             3 => {
-                // host
-                while src.len() < 5 {
+                while src.len() < 1 {
                     stream.read_buf(src).await?;
                 }
-                let len = src[4] as usize;
-                while src.len() < 5 + len + 2 {
+                let len = src.get_u8() as usize;
+                while src.len() < len + 2 {
                     stream.read_buf(src).await?;
                 }
-                src.advance(5 + len + 2);
+                src.advance(len + 2);
             }
             _ => {
                 return Err(io::ErrorKind::InvalidData.into());

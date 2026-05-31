@@ -1,6 +1,6 @@
 use std::{
     io,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
     sync::Arc,
 };
 
@@ -30,12 +30,10 @@ impl SocksHandler {
         while src.len() < 2 {
             stream.read_buf(src).await?;
         }
-        if src[0] != 5 {
+        if src.get_u8() != 5 {
             return Err(io::ErrorKind::InvalidData.into());
         }
-        let nmethods = src[1] as usize;
-        src.advance(2);
-
+        let nmethods = src.get_u8() as usize;
         while src.len() < nmethods {
             stream.read_buf(src).await?;
         }
@@ -55,11 +53,14 @@ impl SocksHandler {
         while src.len() < 4 {
             stream.read_buf(src).await?;
         }
-        if src[0] != 5 || src[1] != 1 {
+        if src.get_u8() != 5 {
             return Err(io::ErrorKind::InvalidData.into());
         }
-        let atyp = src[3];
-        src.advance(4);
+        if src.get_u8() != 1 {
+            return Err(io::ErrorKind::InvalidData.into());
+        }
+        src.get_u8();
+        let atyp = src.get_u8();
         let remote_stream = match atyp {
             1 => self.connect_ipv4(stream, src).await,
             4 => self.connect_ipv6(stream, src).await,
@@ -78,13 +79,10 @@ impl SocksHandler {
         while src.len() < 6 {
             stream.read_buf(src).await?;
         }
-        let ip = Ipv4Addr::from_octets(src[0..4].try_into().unwrap());
-        let port = u16::from_be_bytes(src[4..6].try_into().unwrap());
-        src.advance(6);
-
-        self.connector
-            .connect(SocketAddr::new(IpAddr::V4(ip), port), &src[..])
-            .await
+        let ip = Ipv4Addr::from(src.get_u32());
+        let port = src.get_u16();
+        let addr = SocketAddrV4::new(ip, port).into();
+        self.connector.connect(addr, &src[..]).await
     }
 
     async fn connect_ipv6(
@@ -95,13 +93,10 @@ impl SocksHandler {
         while src.len() < 18 {
             stream.read_buf(src).await?;
         }
-        let ip = Ipv6Addr::from_octets(src[0..16].try_into().unwrap());
-        let port = u16::from_be_bytes(src[16..18].try_into().unwrap());
-        src.advance(18);
-
-        self.connector
-            .connect(SocketAddr::new(IpAddr::V6(ip), port), &src[..])
-            .await
+        let ip = Ipv6Addr::from(src.get_u128());
+        let port = src.get_u16();
+        let addr = SocketAddrV6::new(ip, port, 0, 0).into();
+        self.connector.connect(addr, &src[..]).await
     }
 
     async fn connect_host(
@@ -112,18 +107,15 @@ impl SocksHandler {
         while src.len() < 1 {
             stream.read_buf(src).await?;
         }
-        let host_length = src[0] as usize;
-        src.advance(1);
-
-        while src.len() < host_length + 2 {
+        let host_len = src.get_u8() as usize;
+        while src.len() < host_len + 2 {
             stream.read_buf(src).await?;
         }
-        let host = str::from_utf8(&src[..host_length])
+        let host = str::from_utf8(&src[..host_len])
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, ""))?
             .to_string();
-        let port = u16::from_be_bytes(src[host_length..host_length + 2].try_into().unwrap());
-        src.advance(host_length + 2);
-
+        src.advance(host_len);
+        let port = src.get_u16();
         self.connector.connect_host(&host, port, &src[..]).await
     }
 }

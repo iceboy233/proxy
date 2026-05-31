@@ -164,7 +164,7 @@ impl StreamConnector for SocksConnector {
         let mut stream = self.method_selection(&mut src).await?;
         self.request(&mut stream, &mut src, endpoint, initial_data)
             .await?;
-        Ok(Box::new(TcpStream { stream, src }))
+        Ok(Box::new(SocksStream { stream, src }))
     }
 
     async fn connect_host(
@@ -177,7 +177,7 @@ impl StreamConnector for SocksConnector {
         let mut stream = self.method_selection(&mut src).await?;
         self.request_host(&mut stream, &mut src, host, port, initial_data)
             .await?;
-        Ok(Box::new(TcpStream { stream, src }))
+        Ok(Box::new(SocksStream { stream, src }))
     }
 }
 
@@ -191,12 +191,12 @@ impl DatagramConnector for SocksConnector {
     }
 }
 
-struct TcpStream {
+struct SocksStream {
     stream: Box<dyn AsyncStream + Send + Sync + Unpin>,
     src: BytesMut,
 }
 
-impl AsyncRead for TcpStream {
+impl AsyncRead for SocksStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -215,7 +215,7 @@ impl AsyncRead for TcpStream {
     }
 }
 
-impl AsyncWrite for TcpStream {
+impl AsyncWrite for SocksStream {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,

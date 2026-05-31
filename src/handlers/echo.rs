@@ -21,7 +21,7 @@ impl StreamHandler for EchoHandler {
     ) -> io::Result<()> {
         let mut buf = Box::new_uninit_slice(STREAM_BUFFER_SIZE);
         loop {
-            let mut read_buf = ReadBuf::uninit(&mut *buf);
+            let mut read_buf = ReadBuf::uninit(buf.as_mut());
             stream.read_buf(&mut read_buf).await?;
             let filled = read_buf.filled();
             if filled.is_empty() {
@@ -40,7 +40,7 @@ impl DatagramHandler for EchoHandler {
     ) -> io::Result<()> {
         let mut buf = Box::new_uninit_slice(DATAGRAM_BUFFER_SIZE);
         loop {
-            let mut read_buf = ReadBuf::uninit(&mut *buf);
+            let mut read_buf = ReadBuf::uninit(buf.as_mut());
             if let Ok(addr) = datagram.recv_from(&mut read_buf).await {
                 let _ = datagram.send_to(read_buf.filled(), addr).await;
             }
@@ -67,7 +67,7 @@ mod tests {
 
         let mut buf = vec![0u8; payload.len()].into_boxed_slice();
         client.read_exact(&mut buf).await.unwrap();
-        assert_eq!(&buf[..], payload);
+        assert_eq!(buf.as_ref(), payload);
     }
 
     #[tokio::test]

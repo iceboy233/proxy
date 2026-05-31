@@ -91,9 +91,9 @@ pub struct RecvFrom<'a, R: ?Sized, B: ?Sized> {
 impl<'a, 'b, R: AsyncRecvFrom + Unpin + ?Sized> Future for RecvFrom<'a, R, ReadBuf<'b>> {
     type Output = io::Result<SocketAddr>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let me = &mut *self;
-        Pin::new(&*me.receiver).poll_recv_from(cx, me.buf)
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let me = self.get_mut();
+        Pin::new(me.receiver).poll_recv_from(cx, me.buf)
     }
 }
 
@@ -180,9 +180,9 @@ pub struct SendTo<'a, S: ?Sized, B: ?Sized> {
 impl<'a, S: AsyncSendTo + Unpin + ?Sized> Future for SendTo<'a, S, [u8]> {
     type Output = io::Result<usize>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let me = &mut *self;
-        Pin::new(&*me.sender).poll_send_to(cx, me.buf, me.target)
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let me = self.get_mut();
+        Pin::new(me.sender).poll_send_to(cx, me.buf, me.target)
     }
 }
 

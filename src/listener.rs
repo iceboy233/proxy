@@ -26,7 +26,7 @@ impl Listener {
         let h = handler.clone();
         let datagram = self.udp_socket.clone();
         tokio::spawn(async move {
-            let _ = h.handle_datagram(&*datagram).await;
+            let _ = h.handle_datagram(datagram.as_ref()).await;
         });
 
         loop {

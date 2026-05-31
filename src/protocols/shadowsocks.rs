@@ -452,15 +452,10 @@ where
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        match Pin::new(&mut self.inner).poll_ready(cx) {
-            Poll::Ready(Ok(())) => {
-                let len = buf.len().min(self.max_chunk_size);
-                Poll::Ready(
-                    Pin::new(&mut self.inner)
-                        .start_send(&buf[..len])
-                        .map(|()| len),
-                )
-            }
+        let len = buf.len().min(self.max_chunk_size);
+        let mut inner = Pin::new(&mut self.inner);
+        match inner.as_mut().poll_ready(cx) {
+            Poll::Ready(Ok(())) => Poll::Ready(inner.start_send(&buf[..len]).map(|()| len)),
             Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
             Poll::Pending => Poll::Pending,
         }

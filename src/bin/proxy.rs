@@ -59,7 +59,7 @@ async fn tcp_connect(
     let mut stdio = tokio::io::join(stdin(), stdout());
     copy_bidirectional_with_sizes(
         &mut stdio,
-        stream.as_mut(),
+        &mut stream,
         STREAM_BUFFER_SIZE,
         STREAM_BUFFER_SIZE,
     )

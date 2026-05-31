@@ -82,7 +82,7 @@ impl SocksHandler {
         let ip = Ipv4Addr::from(src.get_u32());
         let port = src.get_u16();
         let addr = SocketAddrV4::new(ip, port).into();
-        self.connector.connect(addr, &src[..]).await
+        self.connector.connect(addr, &src).await
     }
 
     async fn connect_ipv6(
@@ -96,7 +96,7 @@ impl SocksHandler {
         let ip = Ipv6Addr::from(src.get_u128());
         let port = src.get_u16();
         let addr = SocketAddrV6::new(ip, port, 0, 0).into();
-        self.connector.connect(addr, &src[..]).await
+        self.connector.connect(addr, &src).await
     }
 
     async fn connect_host(
@@ -116,7 +116,7 @@ impl SocksHandler {
             .to_string();
         src.advance(host_len);
         let port = src.get_u16();
-        self.connector.connect_host(&host, port, &src[..]).await
+        self.connector.connect_host(&host, port, &src).await
     }
 }
 

@@ -7,7 +7,7 @@ use proxy::{
     traits::Connector,
 };
 use std::{error::Error, fs, net::SocketAddr};
-use tokio::io::{copy_bidirectional_with_sizes, stdin, stdout};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[derive(Clone, Debug, Bpaf)]
 #[bpaf(options, version)]
@@ -56,13 +56,30 @@ async fn tcp_connect(
         let host = parts.next().unwrap();
         connector.connect_host(host, port, &[]).await
     }?;
-    let mut stdio = tokio::io::join(stdin(), stdout());
-    copy_bidirectional_with_sizes(
-        &mut stdio,
-        &mut stream,
-        STREAM_BUFFER_SIZE,
-        STREAM_BUFFER_SIZE,
-    )
-    .await?;
+
+    let mut stdin = tokio::io::stdin();
+    let mut stdout = tokio::io::stdout();
+    let mut in_buf = vec![0u8; STREAM_BUFFER_SIZE].into_boxed_slice();
+    let mut out_buf = vec![0u8; STREAM_BUFFER_SIZE].into_boxed_slice();
+    loop {
+        tokio::select! {
+            res = stdin.read(&mut in_buf) => {
+                let n = res?;
+                if n == 0 {
+                    break;
+                }
+                stream.write_all(&in_buf[..n]).await?;
+                stream.flush().await?;
+            }
+            res = stream.read(&mut out_buf) => {
+                let n = res?;
+                if n == 0 {
+                    break;
+                }
+                stdout.write_all(&out_buf[..n]).await?;
+                stdout.flush().await?;
+            }
+        }
+    }
     Ok(())
 }

@@ -42,7 +42,7 @@ impl DatagramHandler for EchoHandler {
         loop {
             let mut read_buf = ReadBuf::uninit(buf.as_mut());
             if let Ok(addr) = datagram.recv_from(&mut read_buf).await {
-                let _ = datagram.send_to(read_buf.filled(), addr).await;
+                _ = datagram.send_to(read_buf.filled(), addr).await;
             }
         }
     }
@@ -59,7 +59,7 @@ mod tests {
         let handler = EchoHandler;
         let (mut server, mut client) = duplex(STREAM_BUFFER_SIZE);
         tokio::spawn(async move {
-            let _ = handler.handle_stream(&mut server).await;
+            _ = handler.handle_stream(&mut server).await;
         });
 
         let payload = b"test echo stream";
@@ -77,7 +77,7 @@ mod tests {
         let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         let server_addr = server.local_addr().unwrap();
         tokio::spawn(async move {
-            let _ = handler.handle_datagram(&mut server).await;
+            _ = handler.handle_datagram(&mut server).await;
         });
 
         let payload = b"test echo datagram";

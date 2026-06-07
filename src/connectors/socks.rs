@@ -65,6 +65,7 @@ impl SocksConnector {
         };
         dst.put_slice(initial_data);
         stream.write_all(&dst).await?;
+        stream.flush().await?;
 
         self.request_reply(stream, src).await
     }
@@ -88,6 +89,7 @@ impl SocksConnector {
         dst.put_u16(port);
         dst.put_slice(initial_data);
         stream.write_all(&dst).await?;
+        stream.flush().await?;
 
         self.request_reply(stream, src).await
     }

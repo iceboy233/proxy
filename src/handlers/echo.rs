@@ -27,7 +27,8 @@ impl StreamHandler for EchoHandler {
             if filled.is_empty() {
                 return Ok(());
             }
-            stream.write_all(filled).await?
+            stream.write_all(filled).await?;
+            stream.flush().await?;
         }
     }
 }
@@ -64,6 +65,7 @@ mod tests {
 
         let payload = b"test echo stream";
         client.write_all(payload).await.unwrap();
+        client.flush().await.unwrap();
 
         let mut buf = vec![0u8; payload.len()].into_boxed_slice();
         client.read_exact(&mut buf).await.unwrap();

@@ -33,6 +33,7 @@ impl StreamConnector for SystemConnector {
         // TODO: support fastopen connect
         if !initial_data.is_empty() {
             stream.write_all(initial_data).await?;
+            stream.flush().await?;
         }
         Ok(Box::new(stream))
     }
@@ -53,6 +54,7 @@ impl StreamConnector for SystemConnector {
         // TODO: support fastopen connect
         if !initial_data.is_empty() {
             stream.write_all(initial_data).await?;
+            stream.flush().await?;
         }
         Ok(Box::new(stream))
     }

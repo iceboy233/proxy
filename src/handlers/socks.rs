@@ -42,7 +42,8 @@ impl SocksHandler {
             return Err(io::ErrorKind::InvalidData.into());
         }
         src.advance(nmethods);
-        stream.write_all(&[5, 0]).await
+        stream.write_all(&[5, 0]).await?;
+        stream.flush().await
     }
 
     async fn request(
@@ -68,6 +69,7 @@ impl SocksHandler {
             _ => Err(io::ErrorKind::InvalidData.into()),
         }?;
         stream.write_all(&[5, 0, 0, 1, 0, 0, 0, 0, 0, 0]).await?;
+        stream.flush().await?;
         Ok(remote_stream)
     }
 

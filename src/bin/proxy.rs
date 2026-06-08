@@ -6,8 +6,14 @@ use proxy::{
     registry::REGISTRY,
     traits::Connector,
 };
-use std::{error::Error, fs, net::SocketAddr};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::{
+    error::Error,
+    fs, io,
+    net::SocketAddr,
+    pin::Pin,
+    task::{Context, Poll},
+};
+use tokio::io::{copy_bidirectional_with_sizes, AsyncRead, AsyncWrite, ReadBuf};
 
 #[derive(Clone, Debug, Bpaf)]
 #[bpaf(options, version)]
@@ -56,30 +62,65 @@ async fn tcp_connect(
         let host = parts.next().unwrap();
         connector.connect_host(host, port, &[]).await
     }?;
+    let mut stdio = StandardIo::new();
+    copy_bidirectional_with_sizes(
+        &mut stdio,
+        &mut stream,
+        STREAM_BUFFER_SIZE,
+        STREAM_BUFFER_SIZE,
+    )
+    .await?;
+    Ok(())
+}
 
-    let mut stdin = tokio::io::stdin();
-    let mut stdout = tokio::io::stdout();
-    let mut in_buf = vec![0u8; STREAM_BUFFER_SIZE].into_boxed_slice();
-    let mut out_buf = vec![0u8; STREAM_BUFFER_SIZE].into_boxed_slice();
-    loop {
-        tokio::select! {
-            res = stdin.read(&mut in_buf) => {
-                let n = res?;
-                if n == 0 {
-                    break;
-                }
-                stream.write_all(&in_buf[..n]).await?;
-                stream.flush().await?;
-            }
-            res = stream.read(&mut out_buf) => {
-                let n = res?;
-                if n == 0 {
-                    break;
-                }
-                stdout.write_all(&out_buf[..n]).await?;
-                stdout.flush().await?;
-            }
+struct StandardIo {
+    stdin: tokio::io::Stdin,
+    stdout: tokio::io::Stdout,
+    closed: bool,
+    read_waker: Option<std::task::Waker>,
+}
+
+impl StandardIo {
+    fn new() -> Self {
+        Self {
+            stdin: tokio::io::stdin(),
+            stdout: tokio::io::stdout(),
+            closed: false,
+            read_waker: None,
         }
     }
-    Ok(())
+}
+
+impl AsyncRead for StandardIo {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        if self.closed {
+            return Poll::Ready(Ok(()));
+        }
+        self.read_waker = Some(cx.waker().clone());
+        Pin::new(&mut self.stdin).poll_read(cx, buf)
+    }
+}
+
+impl AsyncWrite for StandardIo {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        Pin::new(&mut self.stdout).poll_write(cx, buf)
+    }
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.stdout).poll_flush(cx)
+    }
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        self.closed = true;
+        if let Some(waker) = self.read_waker.take() {
+            waker.wake();
+        }
+        Pin::new(&mut self.stdout).poll_shutdown(cx)
+    }
 }

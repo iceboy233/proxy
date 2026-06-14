@@ -7,27 +7,23 @@ use proxy::{
     traits::Connector,
 };
 use std::{
-    error::Error,
-    fs, io,
-    net::SocketAddr,
-    pin::Pin,
-    task::{Context, Poll},
+    error::Error, fs, io, net::SocketAddr, path::PathBuf, pin::Pin, task::{Context, Poll}
 };
 use tokio::io::{copy_bidirectional_with_sizes, AsyncRead, AsyncWrite, ReadBuf};
 
 #[derive(Clone, Debug, Bpaf)]
 #[bpaf(options, version)]
 struct Options {
+    /// Config file path in TOML format
     #[bpaf(short, long)]
-    /// Config file path in TOML format.
-    config: String,
+    config: PathBuf,
 
+    /// Connects to the target instead of running the handlers
     #[bpaf(long, fallback(String::new()))]
-    /// If specified, connects to the specified target instead of running the handlers.
     tcp_connect_target: String,
 
+    /// Connector to use when connecting to the target
     #[bpaf(long, fallback(String::new()))]
-    /// Connector to use when connecting to the target.
     tcp_connect_with: String,
 }
 

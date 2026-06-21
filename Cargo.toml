@@ -16,6 +16,7 @@ base64 = "0.22"
 blake3 = "1"
 bpaf = { version = "0.9", features = ["bpaf_derive"] }
 bytes = "1"
+fst = "0.4"
 futures-util = { version = "0.3", features = ["sink"] }
 hkdf = "0.13"
 log = "0.4"

@@ -6,11 +6,12 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::{Buf, BytesMut};
-use tokio::io::{copy_bidirectional_with_sizes, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{copy_bidirectional_with_sizes, AsyncWriteExt};
 
 use crate::{
     constants::STREAM_BUFFER_SIZE,
     traits::{AsyncDatagram, AsyncStream, Connector, DatagramHandler, StreamHandler},
+    util::AsyncReadBufExt,
 };
 
 pub struct SocksHandler {
@@ -27,16 +28,12 @@ impl SocksHandler {
         stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
     ) -> io::Result<()> {
-        while src.len() < 2 {
-            stream.read_buf(src).await?;
-        }
+        stream.read_at_least(src, 2).await?;
         if src.get_u8() != 5 {
             return Err(io::ErrorKind::InvalidData.into());
         }
         let nmethods = src.get_u8() as usize;
-        while src.len() < nmethods {
-            stream.read_buf(src).await?;
-        }
+        stream.read_at_least(src, nmethods).await?;
         let methods = &src[..nmethods];
         if !methods.contains(&0) {
             return Err(io::ErrorKind::InvalidData.into());
@@ -51,9 +48,7 @@ impl SocksHandler {
         stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
-        while src.len() < 4 {
-            stream.read_buf(src).await?;
-        }
+        stream.read_at_least(src, 4).await?;
         if src.get_u8() != 5 {
             return Err(io::ErrorKind::InvalidData.into());
         }
@@ -78,9 +73,7 @@ impl SocksHandler {
         stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
-        while src.len() < 6 {
-            stream.read_buf(src).await?;
-        }
+        stream.read_at_least(src, 6).await?;
         let ip = Ipv4Addr::from(src.get_u32());
         let port = src.get_u16();
         let addr = SocketAddrV4::new(ip, port).into();
@@ -92,9 +85,7 @@ impl SocksHandler {
         stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
-        while src.len() < 18 {
-            stream.read_buf(src).await?;
-        }
+        stream.read_at_least(src, 18).await?;
         let ip = Ipv6Addr::from(src.get_u128());
         let port = src.get_u16();
         let addr = SocketAddrV6::new(ip, port, 0, 0).into();
@@ -106,13 +97,9 @@ impl SocksHandler {
         stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
-        while src.len() < 1 {
-            stream.read_buf(src).await?;
-        }
+        stream.read_at_least(src, 1).await?;
         let host_len = src.get_u8() as usize;
-        while src.len() < host_len + 2 {
-            stream.read_buf(src).await?;
-        }
+        stream.read_at_least(src, host_len + 2).await?;
         let host = str::from_utf8(&src[..host_len])
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, ""))?
             .to_string();

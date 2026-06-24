@@ -8,9 +8,12 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::{Buf, BufMut, BytesMut};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
 
-use crate::traits::{AsyncDatagram, AsyncStream, Connector, DatagramConnector, StreamConnector};
+use crate::{
+    traits::{AsyncDatagram, AsyncStream, Connector, DatagramConnector, StreamConnector},
+    util::AsyncReadBufExt,
+};
 
 pub struct SocksConnector {
     connector: Arc<dyn Connector + Send + Sync>,
@@ -28,9 +31,7 @@ impl SocksConnector {
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
         let mut stream = self.connector.connect(self.server, &[5, 1, 0]).await?;
 
-        while src.len() < 2 {
-            stream.read_buf(src).await?;
-        }
+        stream.read_at_least(src, 2).await?;
         if src.get_u8() != 5 {
             return Err(io::ErrorKind::Unsupported.into());
         }
@@ -99,9 +100,7 @@ impl SocksConnector {
         stream: &mut (dyn AsyncStream + Send + Sync + Unpin),
         src: &mut BytesMut,
     ) -> io::Result<()> {
-        while src.len() < 4 {
-            stream.read_buf(src).await?;
-        }
+        stream.read_at_least(src, 4).await?;
         if src.get_u8() != 5 {
             return Err(io::ErrorKind::Unsupported.into());
         }
@@ -124,27 +123,19 @@ impl SocksConnector {
         match src.get_u8() {
             // ipv4
             1 => {
-                while src.len() < 6 {
-                    stream.read_buf(src).await?;
-                }
+                stream.read_at_least(src, 6).await?;
                 src.advance(6);
             }
             // ipv6
             4 => {
-                while src.len() < 18 {
-                    stream.read_buf(src).await?;
-                }
+                stream.read_at_least(src, 18).await?;
                 src.advance(18);
             }
             // host
             3 => {
-                while src.len() < 1 {
-                    stream.read_buf(src).await?;
-                }
+                stream.read_at_least(src, 1).await?;
                 let len = src.get_u8() as usize;
-                while src.len() < len + 2 {
-                    stream.read_buf(src).await?;
-                }
+                stream.read_at_least(src, len + 2).await?;
                 src.advance(len + 2);
             }
             _ => {

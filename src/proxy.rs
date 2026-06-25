@@ -6,7 +6,7 @@ use tokio::task::JoinSet;
 
 use crate::{
     listener::Listener,
-    registry::{ConnectorConfig, HandlerConfig, Registry, REGISTRY},
+    registry::{ConnectorConfig, HandlerConfig, Registry},
     traits::{Connector, Handler},
 };
 
@@ -43,9 +43,8 @@ impl Proxy {
         }
     }
 
-    pub fn create_handlers(&mut self) {
+    pub fn create_handlers(&mut self, registry: &mut Registry) {
         let c = self.config.clone();
-        let registry = REGISTRY.lock().unwrap();
         for handler_config in c.handlers {
             let listen = handler_config.listen;
             let tcp_no_delay = handler_config.tcp_no_delay;

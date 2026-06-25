@@ -2,7 +2,7 @@ use std::{io, sync::Arc};
 
 use serde::Deserialize;
 
-use crate::{connectors::route::RouteConnectorBuilder, registry::REGISTRY};
+use crate::{connectors::route::RouteConnectorBuilder, registry::Registry};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct RouteConnectorConfig {
@@ -28,9 +28,7 @@ pub struct RouteConnectorRuleConfig {
     connector: String,
 }
 
-pub fn init() {
-    let mut registry = REGISTRY.lock().unwrap();
-
+pub fn init(registry: &mut Registry) {
     registry.register_connector("route", |get_connector, config| {
         let c: RouteConnectorConfig = config
             .params

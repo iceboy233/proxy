@@ -6,7 +6,7 @@ use crate::{
     connectors::shadowsocks::ShadowsocksConnector,
     handlers::shadowsocks::ShadowsocksHandler,
     protocols::shadowsocks::{MasterKey, Method},
-    registry::REGISTRY,
+    registry::Registry,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -42,9 +42,7 @@ fn default_max_padding_len() -> u16 {
     900
 }
 
-pub fn init() {
-    let mut registry = REGISTRY.lock().unwrap();
-
+pub fn init(registry: &mut Registry) {
     registry.register_handler("shadowsocks", |get_connector, config| {
         let c: ShadowsocksHandlerConfig = config
             .params

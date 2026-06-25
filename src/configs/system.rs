@@ -2,7 +2,7 @@ use std::{io, sync::Arc};
 
 use serde::Deserialize;
 
-use crate::{connectors::system::SystemConnector, registry::REGISTRY};
+use crate::{connectors::system::SystemConnector, registry::Registry};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SystemConnectorConfig {
@@ -14,9 +14,7 @@ fn default_true() -> bool {
     true
 }
 
-pub fn init() {
-    let mut registry = REGISTRY.lock().unwrap();
-
+pub fn init(registry: &mut Registry) {
     registry.register_connector("system", |_, config| {
         let c: SystemConnectorConfig = config
             .params

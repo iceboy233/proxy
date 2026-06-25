@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    io,
-    net::SocketAddr,
-    sync::{Arc, LazyLock, Mutex},
-};
+use std::{collections::HashMap, io, net::SocketAddr, sync::Arc};
 
 use log::info;
 use serde::Deserialize;
@@ -54,6 +49,13 @@ pub type CreateConnectorFunc =
     fn(&mut GetConnector, ConnectorConfig) -> io::Result<Arc<dyn Connector + Send + Sync>>;
 
 impl Registry {
+    pub fn new() -> Self {
+        Self {
+            handlers: HashMap::new(),
+            connectors: HashMap::new(),
+        }
+    }
+
     pub fn register_handler(&mut self, r#type: &str, func: CreateHandlerFunc) {
         if self.handlers.contains_key(r#type) {
             log::error!("duplicate handler type: {}", r#type);
@@ -108,11 +110,3 @@ impl Registry {
         }
     }
 }
-
-pub static REGISTRY: LazyLock<Mutex<Registry>> = LazyLock::new(|| {
-    let registry = Registry {
-        handlers: HashMap::new(),
-        connectors: HashMap::new(),
-    };
-    Mutex::new(registry)
-});

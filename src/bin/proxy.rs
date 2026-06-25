@@ -3,7 +3,7 @@ use proxy::{
     configs,
     constants::STREAM_BUFFER_SIZE,
     proxy::{Config, Proxy},
-    registry::REGISTRY,
+    registry::Registry,
     traits::Connector,
 };
 use std::{
@@ -30,7 +30,8 @@ struct Options {
 fn main() -> Result<(), Box<dyn Error>> {
     simple_logger::init_with_env()?;
     let options = options().run();
-    configs::init();
+    let mut registry = Registry::new();
+    configs::init(&mut registry);
     let config: Config = toml::from_str(&fs::read_to_string(&options.config)?)?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -38,10 +39,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut proxy = Proxy::new(config);
     if !options.tcp_connect_target.is_empty() {
         let connector =
-            proxy.get_connector(&options.tcp_connect_with, &REGISTRY.lock().unwrap())?;
+            proxy.get_connector(&options.tcp_connect_with, &mut registry)?;
         runtime.block_on(tcp_connect(connector.as_ref(), &options.tcp_connect_target))
     } else {
-        proxy.create_handlers();
+        proxy.create_handlers(&mut registry);
         runtime.block_on(proxy.run()).map_err(|e| e.into())
     }
 }

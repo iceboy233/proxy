@@ -2,7 +2,7 @@ use std::{io, sync::Arc};
 
 use serde::Deserialize;
 
-use crate::{connectors::socks::SocksConnector, handlers::socks::SocksHandler, registry::REGISTRY};
+use crate::{connectors::socks::SocksConnector, handlers::socks::SocksHandler, registry::Registry};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SocksHandlerConfig {
@@ -18,9 +18,7 @@ pub struct SocksConnectorConfig {
     pub connector: String,
 }
 
-pub fn init() {
-    let mut registry = REGISTRY.lock().unwrap();
-
+pub fn init(registry: &mut Registry) {
     registry.register_handler("socks", |get_connector, config| {
         let c: SocksHandlerConfig = config
             .params

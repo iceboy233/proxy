@@ -2,16 +2,20 @@ use std::{io, net::SocketAddr, sync::Arc};
 
 use async_trait::async_trait;
 use fst::raw::Fst;
+use ip_network::IpNetwork;
+use ip_network_table::IpNetworkTable;
 
 use crate::traits::{AsyncDatagram, AsyncStream, Connector, DatagramConnector, StreamConnector};
 
 pub struct RouteConnector {
+    network_table: IpNetworkTable<u64>,
     host_matcher: HostMatcher,
     connectors: Box<[Option<Arc<dyn Connector + Send + Sync>>]>,
     default_connector: Option<Arc<dyn Connector + Send + Sync>>,
 }
 
 pub struct RouteConnectorBuilder {
+    network_table: IpNetworkTable<u64>,
     host_matcher: HostMatcherBuilder,
     connectors: Vec<Option<Arc<dyn Connector + Send + Sync>>>,
     default_connector: Option<Arc<dyn Connector + Send + Sync>>,
@@ -20,25 +24,25 @@ pub struct RouteConnectorBuilder {
 impl RouteConnectorBuilder {
     pub fn new() -> Self {
         Self {
+            network_table: IpNetworkTable::new(),
             host_matcher: HostMatcherBuilder::new(),
             connectors: Vec::new(),
             default_connector: None,
         }
     }
 
-    pub fn add_rule<H, S>(
+    pub fn add_rule<'a>(
         &mut self,
-        hosts: H,
-        host_suffixes: S,
+        networks: impl IntoIterator<Item = &'a IpNetwork>,
+        hosts: impl IntoIterator<Item = impl AsRef<str>>,
+        host_suffixes: impl IntoIterator<Item = impl AsRef<str>>,
         connector: Option<Arc<dyn Connector + Send + Sync>>,
-    ) where
-        H: IntoIterator,
-        H::Item: AsRef<str>,
-        S: IntoIterator,
-        S::Item: AsRef<str>,
-    {
+    ) {
+        let idx = self.connectors.len() as u64;
         self.connectors.push(connector);
-        let idx = (self.connectors.len() - 1) as u64;
+        for network in networks {
+            self.network_table.insert(*network, idx);
+        }
         for host in hosts {
             self.host_matcher.add(host.as_ref(), idx);
         }
@@ -53,6 +57,7 @@ impl RouteConnectorBuilder {
 
     pub fn build(self) -> RouteConnector {
         RouteConnector {
+            network_table: self.network_table,
             host_matcher: self.host_matcher.build(),
             connectors: self.connectors.into_boxed_slice(),
             default_connector: self.default_connector,
@@ -129,7 +134,13 @@ impl StreamConnector for RouteConnector {
         endpoint: SocketAddr,
         initial_data: &[u8],
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
-        match &self.default_connector {
+        let connector = self
+            .network_table
+            .longest_match(endpoint.ip())
+            .and_then(|(_, idx)| self.connectors[*idx as usize].as_ref())
+            .or(self.default_connector.as_ref())
+            .map(|c| c.as_ref());
+        match connector {
             Some(c) => c.connect(endpoint, initial_data).await,
             None => Err(io::ErrorKind::NetworkUnreachable.into()),
         }

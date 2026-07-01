@@ -1,5 +1,6 @@
 use std::{io, sync::Arc};
 
+use ip_network::IpNetwork;
 use serde::Deserialize;
 
 use crate::{connectors::route::RouteConnectorBuilder, registry::Registry};
@@ -12,6 +13,9 @@ pub struct RouteConnectorConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct RouteConnectorRuleConfig {
+    #[serde(default)]
+    networks: Vec<IpNetwork>,
+
     #[serde(default)]
     hosts: Vec<String>,
 
@@ -44,7 +48,7 @@ pub fn init(registry: &mut Registry) {
             if rule.default {
                 builder.set_default_connector(connector.clone());
             }
-            builder.add_rule(&rule.hosts, &rule.host_suffixes, connector);
+            builder.add_rule(&rule.networks, &rule.hosts, &rule.host_suffixes, connector);
         }
         Ok(Arc::new(builder.build()))
     });

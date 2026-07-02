@@ -110,7 +110,7 @@ impl StreamConnector for ShadowsocksConnector {
         dst.put_u8(
             host.len()
                 .try_into()
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, ""))?,
+                .map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?,
         );
         dst.put_slice(host.as_bytes());
         dst.put_u16(port);

@@ -101,7 +101,7 @@ impl SocksHandler {
         let host_len = src.get_u8() as usize;
         stream.read_at_least(src, host_len + 2).await?;
         let host = str::from_utf8(&src[..host_len])
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, ""))?
+            .map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?
             .to_string();
         src.advance(host_len);
         let port = src.get_u16();

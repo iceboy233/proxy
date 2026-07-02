@@ -134,16 +134,13 @@ impl StreamConnector for RouteConnector {
         endpoint: SocketAddr,
         initial_data: &[u8],
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
-        let connector = self
-            .network_table
+        self.network_table
             .longest_match(endpoint.ip())
-            .and_then(|(_, idx)| self.connectors[*idx as usize].as_ref())
-            .or(self.default_connector.as_ref())
-            .map(|c| c.as_ref());
-        match connector {
-            Some(c) => c.connect(endpoint, initial_data).await,
-            None => Err(io::ErrorKind::NetworkUnreachable.into()),
-        }
+            .map(|(_, &idx)| self.connectors[idx as usize].as_ref())
+            .unwrap_or_else(|| self.default_connector.as_ref())
+            .ok_or_else(|| io::Error::from(io::ErrorKind::NetworkUnreachable))?
+            .connect(endpoint, initial_data)
+            .await
     }
 
     async fn connect_host(
@@ -152,16 +149,13 @@ impl StreamConnector for RouteConnector {
         port: u16,
         initial_data: &[u8],
     ) -> io::Result<Box<dyn AsyncStream + Send + Sync + Unpin>> {
-        let connector = self
-            .host_matcher
+        self.host_matcher
             .matches(host)
-            .and_then(|idx| self.connectors[idx as usize].as_ref())
-            .or(self.default_connector.as_ref())
-            .map(|c| c.as_ref());
-        match connector {
-            Some(c) => c.connect_host(host, port, initial_data).await,
-            None => Err(io::ErrorKind::NetworkUnreachable.into()),
-        }
+            .map(|idx| self.connectors[idx as usize].as_ref())
+            .unwrap_or_else(|| self.default_connector.as_ref())
+            .ok_or_else(|| io::Error::from(io::ErrorKind::NetworkUnreachable))?
+            .connect_host(host, port, initial_data)
+            .await
     }
 }
 

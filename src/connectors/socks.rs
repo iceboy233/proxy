@@ -84,7 +84,7 @@ impl SocksConnector {
         dst.put_u8(
             host.len()
                 .try_into()
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, ""))?,
+                .map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?,
         );
         dst.put_slice(host.as_bytes());
         dst.put_u16(port);
@@ -117,7 +117,7 @@ impl SocksConnector {
                 8 => io::ErrorKind::AddrNotAvailable,
                 _ => io::ErrorKind::Other,
             };
-            return Err(io::Error::new(kind, ""));
+            return Err(io::Error::from(kind));
         }
         src.get_u8();
         match src.get_u8() {

@@ -101,7 +101,7 @@ impl ShadowsocksHandler {
             return Err(io::ErrorKind::InvalidData.into());
         }
         let host = str::from_utf8(&src[..host_len])
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, ""))?
+            .map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?
             .to_string();
         src.advance(host_len);
         let port = src.get_u16();
@@ -140,7 +140,7 @@ impl StreamHandler for ShadowsocksHandler {
         let mut header = framed
             .next()
             .await
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, ""))??;
+            .ok_or_else(|| io::Error::from(io::ErrorKind::InvalidData))??;
         // TODO: put salt into filter
         if header.len() < 1 {
             return Err(io::ErrorKind::InvalidData.into());
